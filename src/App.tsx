@@ -968,6 +968,22 @@ function UsersManagement() {
     }
   };
 
+  const deleteUser = async (userId: string) => {
+    if (window.confirm('האם אתה בטוח שברצונך למחוק משתמש זה?')) {
+      try {
+        await deleteDoc(doc(db, 'users', userId));
+      } catch (error) {
+        console.error("Error deleting user:", error);
+      }
+    }
+  };
+
+  const copyInviteLink = () => {
+    const inviteLink = `${window.location.origin}?invite=${businessId}`;
+    navigator.clipboard.writeText(inviteLink);
+    alert('קישור ההזמנה הועתק ללוח!');
+  };
+
   const saveAccountantEmail = async () => {
     if (!businessId) return;
     setSavingEmail(true);
@@ -1014,11 +1030,18 @@ function UsersManagement() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-1 gap-4">
         <h3 className="text-xl font-bold flex items-center gap-2">
           <Users className="w-6 h-6 text-[var(--color-primary)]" />
           ניהול משתמשים והרשאות
         </h3>
+        <button
+          onClick={copyInviteLink}
+          className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          העתק קישור הזמנה
+        </button>
       </div>
 
       <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
@@ -1054,15 +1077,24 @@ function UsersManagement() {
                   </td>
                   <td className="p-4 text-sm text-[var(--color-text-muted)] whitespace-nowrap">{u.email}</td>
                   <td className="p-4 whitespace-nowrap">
-                    <select
-                      value={u.role}
-                      onChange={(e) => updateUserRole(u.id, e.target.value)}
-                      className="bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-[var(--color-primary)] transition-colors"
-                    >
-                      <option value="admin">Admin</option>
-                      <option value="manager">Manager</option>
-                      <option value="accountant">Accountant</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={u.role}
+                        onChange={(e) => updateUserRole(u.id, e.target.value)}
+                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-[var(--color-primary)] transition-colors"
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="manager">Manager</option>
+                        <option value="accountant">Accountant</option>
+                      </select>
+                      <button
+                        onClick={() => deleteUser(u.id)}
+                        className="text-red-400 hover:text-red-300 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="מחק משתמש"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

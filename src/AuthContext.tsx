@@ -54,11 +54,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             setCompletedOnboarding(data.completedOnboarding ?? !!data.businessName);
                             setLoading(false);
                         } else {
-                            // New user: create their own isolated business using their UID as the businessId
-                            console.log("New user — creating isolated business...");
-                            const newRole = currentUser.email === 'aorus.dev@gmail.com' ? 'admin' : 'admin';
-                            // Use the user's own UID as their businessId — guarantees isolation
-                            const newBusinessId = currentUser.uid;
+                            // New user: Check if they used an invite link
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const inviteBusinessId = urlParams.get('invite');
+
+                            let newRole: 'admin' | 'manager' = 'manager';
+                            let newBusinessId = currentUser.uid;
+
+                            if (inviteBusinessId) {
+                                console.log(`Joining existing business via invite: ${inviteBusinessId}`);
+                                newBusinessId = inviteBusinessId;
+                                // Automatically assign manager role for invited users
+                                newRole = 'manager';
+
+                                // Clean up URL
+                                window.history.replaceState({}, document.title, window.location.pathname);
+                            } else {
+                                console.log("New user — creating isolated business...");
+                                if (currentUser.email === 'aorus.dev@gmail.com') newRole = 'admin';
+                                else newRole = 'admin'; // Owner of their new business
+                            }
 
                             setRole(newRole);
                             setBusinessId(newBusinessId);
