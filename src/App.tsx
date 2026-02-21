@@ -1336,33 +1336,44 @@ export function ReviewModal({
                           <td className="p-1">
                             <input
                               type="number"
-                              value={item.quantity}
-                              onChange={e => updateLineItem(i, 'quantity', parseFloat(e.target.value))}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-white outline-none transition-colors text-center"
+                              min="0"
+                              step="0.01"
+                              value={item.quantity || ''}
+                              onChange={e => {
+                                const val = parseFloat(e.target.value);
+                                updateLineItem(i, 'quantity', isNaN(val) ? '' : val);
+                              }}
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-white outline-none transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </td>
                           <td className="p-1">
                             <select
-                              value={item.unit}
+                              value={item.unit || ''}
                               onChange={e => updateLineItem(i, 'unit', e.target.value)}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-white outline-none transition-colors text-center appearance-none cursor-pointer"
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-1 py-1.5 text-white outline-none transition-colors text-center appearance-none cursor-pointer"
                               dir="rtl"
                             >
-                              <option value="יח'">יח'</option>
-                              <option value="ק״ג">ק״ג</option>
-                              <option value="גרם">גרם</option>
-                              <option value="ליטר">ליטר</option>
-                              <option value="מ״ל">מ״ל</option>
-                              <option value="ארגז">ארגז</option>
-                              <option value="מארז">מארז</option>
+                              <option value="" disabled className="bg-[#1a1f2e] text-gray-400">בחר</option>
+                              <option value="יח'" className="bg-[#1a1f2e] text-white">יח'</option>
+                              <option value="ק״ג" className="bg-[#1a1f2e] text-white">ק״ג</option>
+                              <option value="גרם" className="bg-[#1a1f2e] text-white">גרם</option>
+                              <option value="ליטר" className="bg-[#1a1f2e] text-white">ליטר</option>
+                              <option value="מ״ל" className="bg-[#1a1f2e] text-white">מ״ל</option>
+                              <option value="ארגז" className="bg-[#1a1f2e] text-white">ארגז</option>
+                              <option value="מארז" className="bg-[#1a1f2e] text-white">מארז</option>
                             </select>
                           </td>
                           <td className="p-1">
                             <input
                               type="number"
-                              value={item.pricePerUnit}
-                              onChange={e => updateLineItem(i, 'pricePerUnit', parseFloat(e.target.value))}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-[var(--color-primary)] font-bold outline-none transition-colors text-left"
+                              min="0"
+                              step="0.01"
+                              value={item.pricePerUnit || ''}
+                              onChange={e => {
+                                const val = parseFloat(e.target.value);
+                                updateLineItem(i, 'pricePerUnit', isNaN(val) ? '' : val);
+                              }}
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-[var(--color-primary)] font-bold outline-none transition-colors text-left [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               dir="ltr"
                             />
                           </td>
