@@ -22,6 +22,7 @@ function Dashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loadingExpenses, setLoadingExpenses] = useState(true);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Custom Categories and Business Settings
   const defaultCategories = ["חומרי גלם", "שתייה", "אלכוהול", "ציוד", "תחזוקה", "שכירות", "עובדים", "חשמל / מים / גז", "כללי"];
@@ -165,9 +166,9 @@ function Dashboard() {
   };
 
   const deleteExpense = async (expenseId: string) => {
-    if (!window.confirm('למחוק את החשבונית? פעולה זו אינה ניתנת לביטול.')) return;
     try {
       await deleteDoc(doc(db, 'expenses', expenseId));
+      setDeleteConfirmId(null);
       setNotification({ type: 'success', message: 'החשבונית נמחקה בהצלחה.' });
     } catch (error) {
       console.error('Error deleting expense:', error);
@@ -205,21 +206,24 @@ function Dashboard() {
       setNotification({ type: 'error', message: 'אין נתונים לייצוא' });
       return;
     }
-
-    const dataToExport = filteredExpenses.map(exp => ({
-      'תאריך': exp.date,
-      'ספק': exp.supplier,
-      'קטגוריה': exp.category,
-      'סכום': exp.total,
-      'מזהה': exp.id
-    }));
-
-    const ws = utils.json_to_sheet(dataToExport);
-    const wb = utils.book_new();
-    utils.book_append_sheet(wb, ws, "הוצאות");
-    writeFile(wb, `Report_${new Date().toLocaleDateString('he-IL')}.xlsx`);
-
-    setNotification({ type: 'success', message: 'קובץ Excel נוצר בהצלחה!' });
+    try {
+      const dataToExport = filteredExpenses.map(exp => ({
+        'תאריך': exp.date,
+        'ספק': exp.supplier,
+        'קטגוריה': exp.category,
+        'סכום': exp.total,
+        'נשלח לרוח': exp.isSent ? 'כן' : 'לא',
+      }));
+      const ws = utils.json_to_sheet(dataToExport);
+      const wb = utils.book_new();
+      utils.book_append_sheet(wb, ws, "הוצאות");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      writeFile(wb, `BestRest_${dateStr}.xlsx`);
+      setNotification({ type: 'success', message: 'קובץ Excel נוצר בהצלחה!' });
+    } catch (err) {
+      console.error('Excel export error:', err);
+      setNotification({ type: 'error', message: 'שגיאה בייצוא. נסה שוב.' });
+    }
   };
 
   const sendReportToAccountant = async () => {
@@ -246,6 +250,11 @@ function Dashboard() {
       });
       const result = await response.json();
       if (result.success) {
+        // Mark all sent expenses as isSent: true in Firestore
+        const markSentPromises = filteredExpenses.map(exp =>
+          setDoc(doc(db, 'expenses', exp.id), { isSent: true }, { merge: true })
+        );
+        await Promise.all(markSentPromises);
         setNotification({ type: 'success', message: 'הדו״ח נשלח בהצלחה לרואה החשבון!' });
       } else {
         throw new Error(result.error);
@@ -514,7 +523,12 @@ function Dashboard() {
                             <tr key={expense.id} className="hover:bg-white/5 transition-colors group">
                               <td className="p-4 whitespace-nowrap">
                                 <div className="flex flex-col">
-                                  <span className="font-bold text-sm text-white group-hover:text-[var(--color-primary)] transition-colors">{expense.supplier}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-white group-hover:text-[var(--color-primary)] transition-colors">{expense.supplier}</span>
+                                    {expense.isSent && (
+                                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">נשלח</span>
+                                    )}
+                                  </div>
                                   <span className="text-[10px] text-[var(--color-text-muted)]">{expense.date}</span>
                                 </div>
                               </td>
@@ -524,13 +538,26 @@ function Dashboard() {
                               <td className="p-4 font-bold text-[var(--color-primary)] whitespace-nowrap">₪{expense.total?.toLocaleString()}</td>
                               <td className="p-4 whitespace-nowrap">
                                 {(role === 'admin' || role === 'manager') && (
-                                  <button
-                                    onClick={() => deleteExpense(expense.id)}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-500/10 text-red-400 hover:text-red-300"
-                                    title="מחק חשבונית"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  deleteConfirmId === expense.id ? (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => deleteExpense(expense.id)}
+                                        className="text-[10px] font-bold px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                                      >מחק</button>
+                                      <button
+                                        onClick={() => setDeleteConfirmId(null)}
+                                        className="text-[10px] px-2 py-1 rounded bg-white/5 text-gray-400 hover:bg-white/10 transition-colors"
+                                      >בטל</button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setDeleteConfirmId(expense.id)}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-500/10 text-red-400 hover:text-red-300"
+                                      title="מחק חשבונית"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  )
                                 )}
                               </td>
                             </tr>

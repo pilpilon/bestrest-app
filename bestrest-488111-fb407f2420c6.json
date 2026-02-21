@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "bestrest-488111",
+  "private_key_id": "fb407f2420c6943ae681e34d0dee8ae8d94cfa43",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDuoQMwQfFO59qN\nBtgdJi7qckA7y6rDylxk4Y4sMqRTAN7ia/87Z5SkrdIc/tU64NS2iUe93W3aQgeq\nYY529oRy/0Ct1xcEEUC8FHZDb+cgiyLQw/iu7tM12Q6ER8izul4KCbktltDeZUPz\nebftJdZntEVT8xSdwemT7zIWanTwvC+goU4Y/QgNdUH5MuEXJOba23Q3UtzIXsNs\nDYLy2AM/d1HOPbEfwZTg3TtPpgFmVo60+BFypu5noVmQbusa0HBXeNX+BlOzLj21\nWGeGPR4QgERX1BM3z3alFpOdonZJjZiVvaVw1HbKKtvgwQZvbZbF26ocSAqRJkcV\nySwOv1BnAgMBAAECggEAO9agaA+BJVo6kbavps+WYC/6L4Ro8+Pgu2NcNXUVg8Lq\nITkXrZvRyGHWGHNGoRcUABn4pYHLNDnulikUgnxaxkN/wpf3K4vwAbnX1h1Phfed\n6V/bEnLM/+nIHB+sEnWfc0Dw8J+rDLm0Cm/xUUR1uVeZMu33s3+WxQPsOXbEkEEE\ncylCv+DGk8zQpRpsKNzba1f8YrHdm0ZCg7LprSxxuJABVPLt3Jr37mruYK1FTpJR\nVCEbU85ulRx/yBPV5xuIUI+BvHtE8CjQCE1tSP+7JD96iMnWiumQblFVttzjbGGi\niU5QZ1ej2vWdKdrx0taDi0U7copRQV1PaXwisXOWwQKBgQD3V4PmObkFyUSee/7M\nHAeBK3N354B3YtwbQAUvPTHvmlHxlnahQZqs/64xI85bRTqEHGEgpdtinWMf9Z1i\nExA6Lw1UZvG7wLHVQ91q4phZYeqvKrXftnwBP5UNI/uflWATkX5KB2fJJ2VsOiBG\nUbNFx1GXxaFIqXpFXFr1GRkAkQKBgQD2+2tDZzO1LhxRlYTQ2zJEQLjWOtnGbSU6\nAkNALJCwxlyFjsoKTF17GKBGhkJqyBsTv6aurM2AtLq0yEeM6PKJJzUq2uOYjE08\nh1QUrye10kc3RWm7LFVue2Ffd1Y8h4wnaZzDmWcFQ+mq2n/LJfqFToh4t5P5ZZde\nvZTIHeW9dwKBgD2w7EsN9qIE00KcNq7+Brkm90Pez+H3HGMHksN3he73FJ0nJCuQ\nS13+35mODrghCjlNQsR72b489y5PepOtoYyBk9eLXZuwsio5JQ61ub4BeCF8i6Ri\nxYciLrD6WpYxEaeP0GnycuZvFxLpZIdldUtgLW+ncVTIQKDwKhebzOqhAoGALTRJ\nJpYN/bxJzJjcLUnhQmLCMdulnk69wIdHfchqVyCHMJ641feyKGSSeTX7lAW6BvxN\n6qyQFF1/yrTZe63rLjUx4v0bKQGM5WYzenGwh/PLuw8GUg7EOCt23/08mGmKum/3\nFEnQdENA0leZijoSRzHfgpC/EaeJc/qo75OhR/MCgYEA5efxH4rnwZm2T0lV3UEj\nNCPlvvt08pFUgvT21VZnwq3pBsVfERoMTmDjZ8beeU+Uqjyfn2VznjLmfE65mTzZ\nzAQ5MgCbOUQVCdIY6yBSVrrJOFd+nT7S/FIFnoPrfyXU1RZhof/rr+Xz/9Lh+kbU\nNo1PoEmtreqB5KOilIN/UY4=\n-----END PRIVATE KEY-----\n",
+  "client_email": "vision-ocr-bot@bestrest-488111.iam.gserviceaccount.com",
+  "client_id": "110279881046986089062",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/vision-ocr-bot%40bestrest-488111.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
