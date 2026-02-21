@@ -261,14 +261,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 lineItems: []
             };
 
-            // Extract line items from IMAGE (not text) for accurate table reading
-            parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg', rawText);
+            // Extract line items directly with the same model (text-based, reliable)
+            try {
+                const itemsPrompt = `Extract every product line item from this Israeli invoice text.
+Return ONLY a valid JSON array, no markdown, no extra text:
+[{"name":"\u05de\u05d5\u05e6\u05e8","quantity":2,"unit":"\u05d9\u05d7'","pricePerUnit":50.00,"totalPrice":100.00}]
+
+Rules:
+- quantity = how many units ORDERED (look for X 2 or 2 \u05d9\u05d7' patterns, NOT the product size in the name)
+- unit must be one of: \u05d9\u05d7', \u05e7"\u05d2, \u05d2\u05e8\u05dd, \u05dc\u05d9\u05d8\u05e8, \u05de"\u05dc, \u05d0\u05e8\u05d2\u05d6, \u05de\u05d0\u05e8\u05d6
+- pricePerUnit = unit price before multiplying
+- totalPrice = final line total
+If none found return [].
+
+Invoice text:
+${rawText.substring(0, 3000)}`;
+                const itemsResult = await model.generateContent(itemsPrompt);
+                let itemsText = itemsResult.response.text().trim();
+                itemsText = itemsText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+                console.log("Items response (200 chars):", itemsText.substring(0, 200));
+                const itemsParsed = JSON.parse(itemsText);
+                parsed.lineItems = Array.isArray(itemsParsed) ? itemsParsed : [];
+                console.log(`Extracted ${parsed.lineItems.length} line items`);
+            } catch (itemsErr) {
+                console.error("Line items extraction failed:", itemsErr);
+            }
         } else {
             // Full parse with Gemini (text-based for header fields)
             console.log("Document AI entities missing, using Gemini full parse");
             parsed = await parseWithGemini(rawText);
-            // Override line items with Vision-based extraction for accuracy
-            parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg', rawText);
+            // Override line items using text extraction
+            try {
+                const { GoogleGenerativeAI: GeminiAI } = await import('@google/generative-ai');
+                const itemModel = new GeminiAI(process.env.GEMINI_API_KEY!).getGenerativeModel({
+                    model: "gemini-2.0-flash",
+                    generationConfig: { responseMimeType: "application/json" }
+                });
+                const itemsResult = await itemModel.generateContent(
+                    `Extract every product line item from this Israeli invoice text.
+Return ONLY a valid JSON array, no markdown:
+[{"name":"\u05de\u05d5\u05e6\u05e8","quantity":2,"unit":"\u05d9\u05d7'","pricePerUnit":50,"totalPrice":100}]
+quantity = units ordered (X 2 / 2 \u05d9\u05d7'), NOT product size. unit: \u05d9\u05d7', \u05e7"\u05d2, \u05d2\u05e8\u05dd, \u05dc\u05d9\u05d8\u05e8, \u05de"\u05dc, \u05d0\u05e8\u05d2\u05d6, \u05de\u05d0\u05e8\u05d6
+If none return [].
+Text:\n${rawText.substring(0, 3000)}`
+                );
+                let itemsText = itemsResult.response.text().trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+                const itemsParsed = JSON.parse(itemsText);
+                parsed.lineItems = Array.isArray(itemsParsed) ? itemsParsed : [];
+            } catch (e) { console.error("Items extraction failed:", e); }
         }
 
         return res.status(200).json({
