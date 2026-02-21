@@ -76,12 +76,27 @@ If no items found, return [].`;
         ]);
 
         let responseText = result.response.text().trim();
-        // Strip markdown code blocks if Gemini adds them
+        // Strip formatting that might break JSON.parse
         responseText = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
         console.log("Vision items response (200 chars):", responseText.substring(0, 200));
 
-        const parsed = JSON.parse(responseText);
-        const items = Array.isArray(parsed) ? parsed : (parsed?.items || parsed?.lineItems || []);
+        let items: any[] = [];
+        try {
+            const parsed = JSON.parse(responseText);
+            items = Array.isArray(parsed) ? parsed : (parsed?.items || parsed?.lineItems || []);
+        } catch (parseErr) {
+            console.warn("Standard JSON.parse failed, attempting repair. Error:", parseErr);
+            // Fallback: try to extract just the array part using regex
+            const match = responseText.match(/\[\s*\{.*\}\s*\]/s);
+            if (match) {
+                try {
+                    items = JSON.parse(match[0]);
+                } catch (e2) {
+                    console.error("Regex array extraction also failed to parse.");
+                }
+            }
+        }
+
         console.log(`Vision endpoint extracted ${items.length} line items`);
 
         return res.status(200).json({
