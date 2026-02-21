@@ -1311,50 +1311,58 @@ export function ReviewModal({
                   <span className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></span>
                   פירוט מוצרים — ערוך לפני שמירה ({lineItems.length})
                 </p>
-                <div className="max-h-52 overflow-auto rounded-lg border border-white/10 bg-black/20">
-                  <table className="w-full text-right text-[11px]">
-                    <thead className="bg-white/5 text-[var(--color-text-muted)] sticky top-0">
+                <div className="max-h-52 overflow-auto rounded border border-white/10 bg-black/20">
+                  <table className="w-full text-right text-[11px] border-collapse">
+                    <thead className="bg-[#1a1f2e] text-[var(--color-text-muted)] sticky top-0 z-10 shadow-sm">
                       <tr>
-                        <th className="p-2 font-semibold">שם מוצר</th>
-                        <th className="p-2 font-semibold w-16">כמות</th>
-                        <th className="p-2 font-semibold w-16">יחידה</th>
-                        <th className="p-2 font-semibold w-20">מחיר/יחידה (₪)</th>
+                        <th className="p-2 font-semibold text-right">שם מוצר</th>
+                        <th className="p-2 font-semibold text-center w-20">כמות</th>
+                        <th className="p-2 font-semibold text-center w-20">יחידה</th>
+                        <th className="p-2 font-semibold text-left w-24">מחיר/יח' (₪)</th>
                         <th className="p-2 w-8"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {lineItems.map((item: any, i: number) => (
                         <tr key={i} className="hover:bg-white/5 transition-colors group">
-                          <td className="p-1.5">
+                          <td className="p-1 w-full relative">
                             <input
                               type="text"
                               value={item.name}
                               onChange={e => updateLineItem(i, 'name', e.target.value)}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1 text-white outline-none transition-colors text-right"
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-white outline-none transition-colors text-right"
                             />
                           </td>
-                          <td className="p-1.5">
+                          <td className="p-1">
                             <input
                               type="number"
                               value={item.quantity}
                               onChange={e => updateLineItem(i, 'quantity', parseFloat(e.target.value))}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1 text-white outline-none transition-colors text-center"
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-white outline-none transition-colors text-center"
                             />
                           </td>
-                          <td className="p-1.5">
-                            <input
-                              type="text"
+                          <td className="p-1">
+                            <select
                               value={item.unit}
                               onChange={e => updateLineItem(i, 'unit', e.target.value)}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1 text-white outline-none transition-colors text-center"
-                            />
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-white outline-none transition-colors text-center appearance-none cursor-pointer"
+                              dir="rtl"
+                            >
+                              <option value="יח'">יח'</option>
+                              <option value="ק״ג">ק״ג</option>
+                              <option value="גרם">גרם</option>
+                              <option value="ליטר">ליטר</option>
+                              <option value="מ״ל">מ״ל</option>
+                              <option value="ארגז">ארגז</option>
+                              <option value="מארז">מארז</option>
+                            </select>
                           </td>
-                          <td className="p-1.5">
+                          <td className="p-1">
                             <input
                               type="number"
                               value={item.pricePerUnit}
                               onChange={e => updateLineItem(i, 'pricePerUnit', parseFloat(e.target.value))}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1 text-[var(--color-primary)] font-bold outline-none transition-colors text-left"
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-[var(--color-primary)] font-bold outline-none transition-colors text-left"
                               dir="ltr"
                             />
                           </td>
