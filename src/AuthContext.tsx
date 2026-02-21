@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { onSnapshot, doc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
     user: User | null;
@@ -26,69 +26,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        let unsubscribeProfile: (() => void) | null = null;
+
+        const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
             try {
                 console.log("Auth State Changed:", currentUser?.uid);
+
+                // Cleanup previous profile listener if it exists
+                if (unsubscribeProfile) {
+                    unsubscribeProfile();
+                    unsubscribeProfile = null;
+                }
+
                 setUser(currentUser);
+
                 if (currentUser) {
-                    console.log("Checking Firestore for user:", currentUser.uid);
+                    console.log("Setting up snapshot for user:", currentUser.uid);
                     const userDocRef = doc(db, 'users', currentUser.uid);
-                    let data = null;
-                    try {
-                        const userDoc = await getDoc(userDocRef);
-                        data = userDoc.exists() ? userDoc.data() : null;
-                    } catch (e) {
-                        console.warn("Firestore access error, using defaults:", e);
-                    }
 
-                    if (data) {
-                        setRole(data.role || 'manager');
-                        setBusinessId(data.businessId || 'main_branch');
-                        setBusinessName(data.businessName || null);
-                        setCompletedOnboarding(data.completedOnboarding ?? !!data.businessName);
-                    } else {
-                        // New user or offline fallback
-                        console.log("No user data found, using defaults");
-                        const newRole = currentUser.email === 'aorus.dev@gmail.com' ? 'admin' : 'manager';
-                        const newBusinessId = 'main_branch';
-                        setRole(newRole);
-                        setBusinessId(newBusinessId);
-                        setCompletedOnboarding(false);
+                    unsubscribeProfile = onSnapshot(userDocRef, (snapshot) => {
+                        if (snapshot.exists()) {
+                            const data = snapshot.data();
+                            console.log("Profile data updated:", data);
+                            setRole(data.role || 'manager');
+                            setBusinessId(data.businessId || 'main_branch');
+                            setBusinessName(data.businessName || null);
+                            setCompletedOnboarding(data.completedOnboarding ?? !!data.businessName);
+                            setLoading(false);
+                        } else {
+                            // New user or missing profile document
+                            console.log("No user profile found, initializing...");
+                            const newRole = currentUser.email === 'aorus.dev@gmail.com' ? 'admin' : 'manager';
+                            const newBusinessId = 'main_branch';
 
-                        // Try to persist new user if it was a missing document (non-blocking)
-                        setTimeout(async () => {
-                            try {
-                                await setDoc(userDocRef, {
-                                    uid: currentUser.uid,
-                                    email: currentUser.email,
-                                    displayName: currentUser.displayName,
-                                    photoURL: currentUser.photoURL,
-                                    role: newRole,
-                                    businessId: newBusinessId,
-                                    completedOnboarding: false,
-                                    createdAt: new Date().toISOString()
-                                }, { merge: true });
-                            } catch (e) {
-                                console.error("Failed to persist user profile (offline?):", e);
-                            }
-                        }, 0);
-                    }
+                            setRole(newRole);
+                            setBusinessId(newBusinessId);
+                            setCompletedOnboarding(false);
+                            setLoading(false);
+
+                            // Create initial profile document
+                            setDoc(userDocRef, {
+                                uid: currentUser.uid,
+                                email: currentUser.email,
+                                displayName: currentUser.displayName,
+                                photoURL: currentUser.photoURL,
+                                role: newRole,
+                                businessId: newBusinessId,
+                                completedOnboarding: false,
+                                createdAt: new Date().toISOString()
+                            }, { merge: true }).catch(e => console.error("Failed to persist initial user profile:", e));
+                        }
+                    }, (error) => {
+                        console.error("Firestore profile snapshot error:", error);
+                        setLoading(false);
+                    });
                 } else {
                     console.log("No user logged in");
                     setRole(null);
                     setBusinessId(null);
                     setBusinessName(null);
                     setCompletedOnboarding(false);
+                    setLoading(false);
                 }
             } catch (error) {
                 console.error("Auth context initialization error:", error);
-            } finally {
-                console.log("Auth loading finished");
                 setLoading(false);
             }
         });
 
-        return () => unsubscribe();
+        return () => {
+            unsubscribeAuth();
+            if (unsubscribeProfile) unsubscribeProfile();
+        };
     }, []);
 
     const signInWithGoogle = async () => {

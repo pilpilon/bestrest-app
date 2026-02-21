@@ -4,6 +4,7 @@ import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Login } from './Login';
 import { Onboarding } from './Onboarding';
+import { Cookbook } from './Cookbook';
 import { useRef, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -23,7 +24,7 @@ function Dashboard() {
   const [loadingExpenses, setLoadingExpenses] = useState(true);
 
   // View State
-  const [currentView, setCurrentView] = useState<'dashboard' | 'users'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'cookbook' | 'users'>('dashboard');
 
   useEffect(() => {
     if (!user || !businessId) return;
@@ -38,6 +39,10 @@ function Dashboard() {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setExpenses(docs);
       setLoadingExpenses(false);
+    }, (error) => {
+      console.error("Firestore expenses snapshot error:", error);
+      setLoadingExpenses(false);
+      setNotification({ type: 'error', message: 'שגיאה בטעינת נתונים. בדוק את ה-Console לצורך יצירת אינדקס.' });
     });
 
     return () => unsubscribe();
@@ -455,6 +460,8 @@ function Dashboard() {
                 </div>
               </section>
             </>
+          ) : currentView === 'cookbook' ? (
+            <Cookbook />
           ) : (
             <UsersManagement />
           )}
@@ -470,9 +477,12 @@ function Dashboard() {
               <LayoutDashboard className="w-6 h-6" />
               <span className="text-[10px] font-bold">דשבורד</span>
             </button>
-            <button className="flex flex-col items-center gap-1 text-[var(--color-text-muted)] h-full">
+            <button
+              onClick={() => setCurrentView('cookbook')}
+              className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'cookbook' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+            >
               <Receipt className="w-6 h-6" />
-              <span className="text-[10px] font-medium">קבלות</span>
+              <span className="text-[10px] font-medium">מתכונים</span>
             </button>
 
             {role !== 'accountant' && (
@@ -537,6 +547,9 @@ function UsersManagement() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setUsers(docs);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firestore users snapshot error:", error);
       setLoading(false);
     });
     return () => unsubscribe();
