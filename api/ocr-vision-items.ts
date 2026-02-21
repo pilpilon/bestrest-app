@@ -1,11 +1,25 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
+// Increase body size limit for base64 images
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: '10mb'
+        }
+    }
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { imageBase64, mimeType } = req.body;
+    let { imageBase64, mimeType } = req.body;
+
+    // Strip data URL prefix if present (e.g. "data:image/jpeg;base64,...")
+    if (imageBase64 && imageBase64.includes(',')) {
+        imageBase64 = imageBase64.split(',')[1];
+    }
 
     if (!imageBase64) {
         return res.status(400).json({ error: 'Missing imageBase64' });
@@ -19,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash-lite",
             generationConfig: { responseMimeType: "application/json" }
         });
 

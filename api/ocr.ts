@@ -88,7 +88,7 @@ async function extractLineItemsFromImage(imageBase64: string, imageMimeType: str
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash-lite",
             generationConfig: { responseMimeType: "application/json" }
         });
 
@@ -135,7 +135,7 @@ async function extractLineItemsFromText(rawText: string): Promise<any[]> {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash-lite",
             generationConfig: { responseMimeType: "application/json" }
         });
         const result = await model.generateContent(
@@ -246,7 +246,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.log("Document AI entities OK, asking Gemini for category only");
             const { GoogleGenerativeAI } = await import('@google/generative-ai');
             const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!).getGenerativeModel({
-                model: "gemini-2.0-flash",
+                model: "gemini-2.5-flash-lite",
                 generationConfig: { responseMimeType: "application/json" }
             });
             const catResult = await model.generateContent(
@@ -306,7 +306,7 @@ ${rawText.substring(0, 3000)}`;
             try {
                 const { GoogleGenerativeAI: GeminiAI } = await import('@google/generative-ai');
                 const itemModel = new GeminiAI(process.env.GEMINI_API_KEY!).getGenerativeModel({
-                    model: "gemini-2.0-flash",
+                    model: "gemini-2.5-flash-lite",
                     generationConfig: { responseMimeType: "application/json" }
                 });
                 const itemsResult = await itemModel.generateContent(
