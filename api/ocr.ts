@@ -82,6 +82,54 @@ ${rawText.substring(0, 3000)}
     };
 }
 
+// Helper: extract line items from the original invoice IMAGE using Vision
+async function extractLineItemsFromImage(imageBase64: string, imageMimeType: string): Promise<any[]> {
+    try {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.0-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `You are reading an Israeli invoice/receipt IMAGE. 
+Extract every line item (product row) from the table in this invoice.
+
+Look at the COLUMNS in the invoice table carefully:
+- Find the product name column
+- Find the quantity column (כמות / מס"\u05e4 / יח')
+- Find the unit price column (מחיר / מחיר ליחידה)
+- Find the total column (סכום / סה"כ)
+
+CRITICAL RULES:
+- "quantity": This is the NUMBER OF UNITS ORDERED (how many items). Look at the qty/כמות column specifically. On Israeli invoices it often appears as "X 2" or in a dedicated column. Do NOT use the product weight/size from the product name.
+- "unit": Use ONLY one of: יח', ק"ג, גרם, ליטר, מ"ל, ארגז, מארז
+- "name": Full product name in Hebrew as shown on the invoice
+- "pricePerUnit": The price for ONE unit
+- "totalPrice": The line total (quantity × pricePerUnit)
+
+Return ONLY a valid JSON array:
+[{"name": "וודקה סמירנוף ליטר", "quantity": 2, "unit": "יח'", "pricePerUnit": 89.90, "totalPrice": 179.80}]
+If no items found, return [].`;
+
+        const result = await model.generateContent([
+            prompt,
+            {
+                inlineData: {
+                    data: imageBase64,
+                    mimeType: imageMimeType
+                }
+            }
+        ]);
+
+        const parsed = JSON.parse(result.response.text());
+        return Array.isArray(parsed) ? parsed : (parsed?.items || parsed?.lineItems || []);
+    } catch (err) {
+        console.error("Vision line-item extraction failed:", err);
+        return [];
+    }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -189,34 +237,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 lineItems: []
             };
 
-            // Extract line items via a separate Gemini call
-            try {
-                const itemsResult = await model.generateContent(
-                    `Extract individual line items from this Israeli invoice/receipt.
-
-CRITICAL RULES:
-- "name": Full product name in Hebrew (include size/weight if part of the name, e.g. "צ'יפס אמריקאי (10 קילו)")
-- "quantity": ONLY the NUMBER OF UNITS ORDERED. This is how many items/boxes/bottles were purchased, shown as "X 2" or "2 יח'" on Israeli invoices. Do NOT confuse with the product's weight/size in the name. Example: "צ'יפס 10 ק"ג X 2" → quantity is 2, NOT 10.
-- "unit": Use ONLY one of: יח', ק"ג, גרם, ליטר, מ"ל, ארגז, מארז
-- "pricePerUnit": Price for ONE unit BEFORE multiplication
-- "totalPrice": Final line total AFTER multiplication (quantity × pricePerUnit)
-
-Return ONLY valid JSON array:
-[{"name": "וודקה סמירנוף ליטר", "quantity": 2, "unit": "יח'", "pricePerUnit": 89.90, "totalPrice": 179.80}]
-If no items found return [].
-
-Receipt text:
-${rawText.substring(0, 3000)}`
-                );
-                const itemsParsed = JSON.parse(itemsResult.response.text());
-                parsed.lineItems = Array.isArray(itemsParsed) ? itemsParsed : (itemsParsed?.items || []);
-            } catch (itemsErr) {
-                console.error("Line items extraction failed:", itemsErr);
-            }
+            // Extract line items from IMAGE (not text) for accurate table reading
+            parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg');
         } else {
-            // Full parse with Gemini
+            // Full parse with Gemini (text-based for header fields)
             console.log("Document AI entities missing, using Gemini full parse");
             parsed = await parseWithGemini(rawText);
+            // Override line items with Vision-based extraction for accuracy
+            parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg');
         }
 
         return res.status(200).json({
