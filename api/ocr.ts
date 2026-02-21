@@ -349,14 +349,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // --- Step 3: Extract line items from IMAGE using Vision (primary) ---
-        try {
-            console.log("Extracting line items via Gemini Vision (image-based)...");
-            parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg', rawText);
-            // Fix swapped qty/price where math is ambiguous (e.g. 2.5x150=375 and 150x2.5=375)
-            parsed.lineItems = fixSwappedQtyPrice(parsed.lineItems);
-            console.log(`Vision extracted ${parsed.lineItems.length} line items from image`);
-        } catch (itemsErr) {
-            console.error("Line items extraction failed:", itemsErr);
+        // Utility/non-itemized categories have no real line item table — skip Vision for these
+        // and return a single summary item to avoid garbage extraction.
+        const NO_ITEMS_CATEGORIES = ['חשמל / מים / גז', 'שכירות', 'עובדים', 'תחזוקה'];
+        const isUtilityInvoice = NO_ITEMS_CATEGORIES.some(cat => parsed.category?.includes(cat.split(' ')[0]));
+
+        if (isUtilityInvoice) {
+            console.log(`Utility category "${parsed.category}" — skipping Vision, using summary item`);
+            parsed.lineItems = [{
+                name: parsed.supplier || parsed.category,
+                quantity: 1,
+                unit: "יח'",
+                pricePerUnit: parsed.total,
+                totalPrice: parsed.total,
+            }];
+        } else {
+            try {
+                console.log("Extracting line items via Gemini Vision (image-based)...");
+                parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg', rawText);
+                // Fix swapped qty/price where math is ambiguous (e.g. 2.5x150=375 and 150x2.5=375)
+                parsed.lineItems = fixSwappedQtyPrice(parsed.lineItems);
+                console.log(`Vision extracted ${parsed.lineItems.length} line items from image`);
+            } catch (itemsErr) {
+                console.error("Line items extraction failed:", itemsErr);
+            }
         }
 
         return res.status(200).json({
