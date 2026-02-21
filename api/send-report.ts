@@ -83,12 +83,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       auth: { user: SMTP_USER, pass: SMTP_PASS },
     });
 
+    // Prepare Attachments
+    const attachments = expenses
+      .filter((exp: any) => exp.imageUrl && exp.imageUrl.startsWith('data:'))
+      .map((exp: any, index: number) => {
+        const contentType = exp.imageUrl.split(';')[0].split(':')[1];
+        const base64Data = exp.imageUrl.split(',')[1];
+        const extension = contentType.split('/')[1] || 'jpg';
+
+        // Sanitize supplier name for filename
+        const safeSupplier = (exp.supplier || 'invoice')
+          .replace(/[^a-z0-9א-ת]/gi, '_')
+          .substring(0, 20);
+        const safeDate = (exp.date || new Date().toISOString().split('T')[0])
+          .replace(/[^0-9]/g, '-');
+
+        return {
+          filename: `${safeSupplier}_${safeDate}_${index + 1}.${extension}`,
+          content: base64Data,
+          encoding: 'base64',
+          contentType: contentType
+        };
+      });
+
     await transporter.sendMail({
       from: `"BestRest POS" <${SMTP_USER}>`,
       to: accountantEmail,
       cc: userEmail,
       subject: `דו״ח הוצאות — ${businessName || 'מסעדה'} — ${new Date().toLocaleDateString('he-IL')}`,
       html: htmlContent,
+      attachments
     });
 
     return res.status(200).json({ success: true, message: 'Report sent successfully' });

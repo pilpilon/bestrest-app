@@ -22,6 +22,7 @@ function Dashboard() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loadingExpenses, setLoadingExpenses] = useState(true);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [selectedExpenseForPreview, setSelectedExpenseForPreview] = useState<any | null>(null);
 
   // Custom Categories and Business Settings
   const defaultCategories = ["חומרי גלם", "שתייה", "אלכוהול", "ציוד", "תחזוקה", "שכירות", "עובדים", "חשמל / מים / גז", "כללי"];
@@ -77,11 +78,10 @@ function Dashboard() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Create a local preview URL (no Firebase Storage needed for scan)
-    const localPreviewUrl = URL.createObjectURL(file);
-
     // Show 0% progress while encoding
     setUploadProgress(0);
+
+    let base64Image = '';
 
     try {
       // Read file as base64 and send directly to OCR API — no CORS issues
@@ -90,7 +90,9 @@ function Dashboard() {
         reader.onload = () => {
           const result = reader.result as string;
           // Strip the data URL prefix (e.g. "data:image/jpeg;base64,")
-          resolve(result.split(',')[1]);
+          const b64 = result.split(',')[1];
+          base64Image = result; // Keep full data URL for display
+          resolve(b64);
         };
         reader.onerror = reject;
         reader.readAsDataURL(file);
@@ -123,7 +125,7 @@ function Dashboard() {
         setOcrResult({
           ...result.data,
           category: finalCategory,
-          imageUrl: localPreviewUrl
+          imageUrl: base64Image // Store full base64 data URL
         });
         setIsReviewing(true);
       } else {
@@ -537,7 +539,11 @@ function Dashboard() {
                           </tr>
                         ) : (
                           filteredExpenses.map((expense) => (
-                            <tr key={expense.id} className="hover:bg-white/5 transition-colors group">
+                            <tr
+                              key={expense.id}
+                              onClick={() => expense.imageUrl && setSelectedExpenseForPreview(expense)}
+                              className={`transition-colors group ${expense.imageUrl ? 'hover:bg-white/10 cursor-pointer' : 'hover:bg-white/5'}`}
+                            >
                               <td className="p-4 whitespace-nowrap">
                                 <div className="flex flex-col">
                                   <div className="flex items-center gap-2">
@@ -558,17 +564,17 @@ function Dashboard() {
                                   deleteConfirmId === expense.id ? (
                                     <div className="flex items-center gap-1">
                                       <button
-                                        onClick={() => deleteExpense(expense.id)}
+                                        onClick={(e) => { e.stopPropagation(); deleteExpense(expense.id); }}
                                         className="text-[10px] font-bold px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
                                       >מחק</button>
                                       <button
-                                        onClick={() => setDeleteConfirmId(null)}
+                                        onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(null); }}
                                         className="text-[10px] px-2 py-1 rounded bg-white/5 text-gray-400 hover:bg-white/10 transition-colors"
                                       >בטל</button>
                                     </div>
                                   ) : (
                                     <button
-                                      onClick={() => setDeleteConfirmId(expense.id)}
+                                      onClick={(e) => { e.stopPropagation(); setDeleteConfirmId(expense.id); }}
                                       className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-500/10 text-red-400 hover:text-red-300"
                                       title="מחק חשבונית"
                                     >
@@ -645,6 +651,39 @@ function Dashboard() {
             onAddCategory={addCustomCategory}
           />
         )}
+
+        {/* Image Preview Modal */}
+        {selectedExpenseForPreview && (
+          <ImagePreviewModal
+            expense={selectedExpenseForPreview}
+            onClose={() => setSelectedExpenseForPreview(null)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ImagePreviewModal({ expense, onClose }: { expense: any, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" dir="rtl">
+      <div className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        <div className="p-4 border-b border-white/10 flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-bold text-white">{expense.supplier}</h2>
+            <p className="text-xs text-[var(--color-text-muted)]">{expense.date} • ₪{expense.total?.toLocaleString()}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-2 bg-white/5 rounded-lg">
+            <Plus className="w-6 h-6 rotate-45" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-black/20">
+          <img
+            src={expense.imageUrl}
+            alt="Invoice"
+            className="max-w-full h-auto rounded-lg shadow-2xl border border-white/5"
+          />
+        </div>
       </div>
     </div>
   );
