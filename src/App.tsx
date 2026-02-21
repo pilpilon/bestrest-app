@@ -23,8 +23,19 @@ function Dashboard() {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loadingExpenses, setLoadingExpenses] = useState(true);
 
+  // Custom Categories and Business Settings
+  const defaultCategories = ["חומרי גלם", "שתייה", "אלכוהול", "ציוד", "תחזוקה", "שכירות", "עובדים", "חשמל / מים / גז", "כללי"];
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const allCategories = Array.from(new Set([...defaultCategories, ...customCategories]));
+
   // View State
   const [currentView, setCurrentView] = useState<'dashboard' | 'cookbook' | 'users'>('dashboard');
+  const [isSendingReport, setIsSendingReport] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  // New Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('הכל');
 
   useEffect(() => {
     if (!user || !businessId) return;
@@ -47,6 +58,18 @@ function Dashboard() {
 
     return () => unsubscribe();
   }, [user, businessId]);
+
+  // Load Custom Categories
+  useEffect(() => {
+    if (!businessId) return;
+    const unsub = onSnapshot(doc(db, 'businesses', businessId), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        setCustomCategories(data.customCategories || []);
+      }
+    });
+    return () => unsub();
+  }, [businessId]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,7 +109,20 @@ function Dashboard() {
       const result = await response.json();
 
       if (result.success) {
-        setOcrResult({ ...result.data, imageUrl: localPreviewUrl });
+        // Auto-assign category based on history if AI failed or returned 'כללי'
+        let finalCategory = result.data.category;
+        if (finalCategory === "כללי") {
+          const pastExpense = expenses.find(e => e.supplier === result.data.supplier);
+          if (pastExpense) {
+            finalCategory = pastExpense.category;
+          }
+        }
+
+        setOcrResult({
+          ...result.data,
+          category: finalCategory,
+          imageUrl: localPreviewUrl
+        });
         setIsReviewing(true);
       } else {
         console.error('OCR API error:', result.error);
@@ -115,9 +151,6 @@ function Dashboard() {
         businessId: businessId,
         createdAt: serverTimestamp(),
       });
-      setIsReviewing(false);
-      setOcrResult(null);
-      // Optional: Trigger a refresh of the dashboard table
     } catch (error) {
       console.error("Error saving expense", error);
     } finally {
@@ -125,12 +158,16 @@ function Dashboard() {
     }
   };
 
-  const [isSendingReport, setIsSendingReport] = useState(false);
-  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-
-  // New Filter States
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('הכל');
+  const addCustomCategory = async (newCategory: string) => {
+    if (!businessId) return;
+    try {
+      const bizRef = doc(db, 'businesses', businessId);
+      const updatedCategories = Array.from(new Set([...customCategories, newCategory]));
+      await setDoc(bizRef, { customCategories: updatedCategories }, { merge: true });
+    } catch (error) {
+      console.error("Error adding custom category:", error);
+    }
+  };
 
   const filteredExpenses = expenses.filter(exp => {
     const matchesSearch = exp.supplier?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -394,7 +431,7 @@ function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-                  {['הכל', 'מזון', 'שתייה', 'ניקיון', 'כללי'].map(cat => (
+                  {['הכל', ...allCategories].map(cat => (
                     <button
                       key={cat}
                       onClick={() => setActiveCategory(cat)}
@@ -525,8 +562,10 @@ function Dashboard() {
           <ReviewModal
             data={ocrResult}
             isSaving={isSaving}
+            allCategories={allCategories}
             onClose={() => setIsReviewing(false)}
             onSave={saveExpense}
+            onAddCategory={addCustomCategory}
           />
         )}
       </div>
@@ -645,8 +684,33 @@ function UsersManagement() {
   );
 }
 
-function ReviewModal({ data, isSaving, onClose, onSave }: { data: any, isSaving: boolean, onClose: () => void, onSave: (data: any) => void }) {
+function ReviewModal({
+  data,
+  isSaving,
+  allCategories,
+  onClose,
+  onSave,
+  onAddCategory
+}: {
+  data: any,
+  isSaving: boolean,
+  allCategories: string[],
+  onClose: () => void,
+  onSave: (data: any) => void,
+  onAddCategory: (category: string) => void
+}) {
   const [editedData, setEditedData] = useState(data);
+  const [newCategory, setNewCategory] = useState('');
+  const [showAddCategory, setShowAddCategory] = useState(false);
+
+  const handleAddCategory = () => {
+    if (newCategory.trim()) {
+      onAddCategory(newCategory.trim());
+      setEditedData({ ...editedData, category: newCategory.trim() });
+      setNewCategory('');
+      setShowAddCategory(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300" dir="rtl">
@@ -702,22 +766,52 @@ function ReviewModal({ data, isSaving, onClose, onSave }: { data: any, isSaving:
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs text-[var(--color-text-muted)] font-medium">קטגוריה</label>
-              <select
-                value={editedData.category}
-                onChange={(e) => setEditedData({ ...editedData, category: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors appearance-none"
-              >
-                <option value="חומרי גלם">חומרי גלם</option>
-                <option value="שתייה">שתייה</option>
-                <option value="אלכוהול">אלכוהול</option>
-                <option value="ציוד">ציוד</option>
-                <option value="תחזוקה">תחזוקה</option>
-                <option value="שכירות">שכירות</option>
-                <option value="עובדים">עובדים</option>
-                <option value="חשמל / מים / גז">חשמל / מים / גז</option>
-                <option value="כללי">כללי</option>
-              </select>
+              <div className="flex justify-between items-center">
+                <label className="text-xs text-[var(--color-text-muted)] font-medium">קטגוריה</label>
+                {!showAddCategory && (
+                  <button
+                    onClick={() => setShowAddCategory(true)}
+                    className="text-[10px] text-[var(--color-primary)] hover:underline"
+                  >
+                    + קטגוריה חדשה
+                  </button>
+                )}
+              </div>
+
+              {!showAddCategory ? (
+                <select
+                  value={editedData.category}
+                  onChange={(e) => setEditedData({ ...editedData, category: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors appearance-none"
+                >
+                  {allCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="שם הקטגוריה..."
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleAddCategory}
+                    className="bg-[var(--color-primary)] text-slate-900 px-4 rounded-lg font-bold text-sm"
+                  >
+                    הוסף
+                  </button>
+                  <button
+                    onClick={() => setShowAddCategory(false)}
+                    className="px-4 border border-white/10 text-white rounded-lg text-sm"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="pt-4 border-t border-white/5">
