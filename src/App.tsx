@@ -478,7 +478,7 @@ function Dashboard() {
                 </div>
 
                 {/* Card 3: Top Supplier (real data) */}
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl md:block hidden">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl">
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">ספק מוביל</p>
                   {topSupplier ? (
                     <>
@@ -491,7 +491,7 @@ function Dashboard() {
                 </div>
 
                 {/* Card 4: Price Rise Detector */}
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl md:block hidden relative">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative">
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">מגמת מחירים ⚡</p>
                   {priceRiseAlerts.length > 0 ? (
                     <div className="space-y-1.5 mt-1">
