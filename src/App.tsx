@@ -151,8 +151,12 @@ function Dashboard() {
         businessId: businessId,
         createdAt: serverTimestamp(),
       });
+      setIsReviewing(false);
+      setOcrResult(null);
+      setNotification({ type: 'success', message: 'החשבונית נשמרה בהצלחה! ✓' });
     } catch (error) {
       console.error("Error saving expense", error);
+      setNotification({ type: 'error', message: 'שגיאה בשמירת החשבונית. נסה שוב.' });
     } finally {
       setIsSaving(false);
     }
@@ -782,10 +786,10 @@ function ReviewModal({
                 <select
                   value={editedData.category}
                   onChange={(e) => setEditedData({ ...editedData, category: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors appearance-none"
+                  className="w-full bg-[#0f172a] border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
                 >
                   {allCategories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat} value={cat} style={{ backgroundColor: '#0f172a', color: '#fff' }}>{cat}</option>
                   ))}
                 </select>
               ) : (
