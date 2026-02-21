@@ -582,12 +582,12 @@ function UsersManagement() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  if (role !== 'admin') {
+  if (role !== 'admin' && role !== 'manager') {
     return (
       <div className="flex flex-col items-center justify-center p-12 text-center space-y-4 bg-white/5 rounded-2xl border border-white/10">
         <Settings className="w-12 h-12 text-orange-500 animate-pulse" />
         <h3 className="text-xl font-bold">גישה מוגבלת</h3>
-        <p className="text-[var(--color-text-muted)] text-sm">רק מנהלי מערכת רשאים לנהל משתמשים והרשאות.</p>
+        <p className="text-[var(--color-text-muted)] text-sm">רק מנהלים ובעלי הרשאות רשאים לנהל משתמשים.</p>
       </div>
     );
   }
