@@ -849,6 +849,13 @@ function Dashboard() {
           </div>
         </nav>
 
+        {/* Upgrade Modal */}
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          featureName={upgradeFeature}
+        />
+
         {/* Review Modal */}
         {isReviewing && ocrResult && (
           <ReviewModal
