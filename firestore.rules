@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to get user role
+    function getRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // User Profile Rules
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (request.auth.uid == userId || getRole() == 'admin');
+    }
+
+    // Expense Rules
+    match /expenses/{expenseId} {
+      function sameBusiness() {
+        return resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
+      }
+      
+      allow read: if request.auth != null && sameBusiness() && (getRole() in ['admin', 'manager', 'accountant']);
+      allow create: if request.auth != null && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId && (getRole() in ['admin', 'manager']);
+      allow update: if request.auth != null && sameBusiness() && (getRole() in ['admin', 'manager']);
+      allow delete: if request.auth != null && sameBusiness() && (getRole() == 'admin');
+    }
+  }
+}

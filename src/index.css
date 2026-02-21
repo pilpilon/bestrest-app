@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0B1120;
+  --color-surface: #1E293B;
+  --color-primary: #10B981;
+  --color-primary-hover: #059669;
+  --color-secondary: #3B82F6;
+  --color-danger: #EF4444;
+  --color-text-main: #F8FAFC;
+  --color-text-muted: #94A3B8;
+  --color-border: #334155;
+
+  --font-sans: 'Heebo', system-ui, sans-serif;
+
+  --shadow-glass: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --shadow-glow: 0 0 15px -3px rgba(16, 185, 129, 0.4);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text-main);
+    font-family: var(--font-sans);
+    direction: rtl;
+    /* Enforce Hebrew RTL globally */
+  }
+}
+
+@layer components {
+  .glass-card {
+    background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-glass);
+  }
+
+  .glass-input {
+    background-color: color-mix(in srgb, var(--color-background) 50%, transparent);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+    padding: 0.5rem 1rem;
+    color: var(--color-text-main);
+    transition: all 0.2s;
+  }
+
+  .glass-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+  }
+
+  .btn-primary {
+    background-color: var(--color-primary);
+    color: white;
+    font-weight: 500;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-glow);
+    transition: all 0.3s;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-primary-hover);
+  }
+
+  .btn-secondary {
+    background-color: var(--color-surface);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--color-text-main);
+    font-weight: 500;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.75rem;
+    transition: all 0.3s;
+  }
+
+  .btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Custom Scrollbar for dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

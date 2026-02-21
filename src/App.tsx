@@ -1,0 +1,751 @@
+import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings } from 'lucide-react';
+import { utils, writeFile } from 'xlsx';
+import './index.css';
+import { AuthProvider, useAuth } from './AuthContext';
+import { Login } from './Login';
+import { Onboarding } from './Onboarding';
+import { useRef, useState, useEffect } from 'react';
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { db, storage } from './firebase';
+
+function Dashboard() {
+  const { user, role, businessId, businessName, logout } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
+  const [ocrResult, setOcrResult] = useState<any>(null);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [loadingExpenses, setLoadingExpenses] = useState(true);
+
+  // View State
+  const [currentView, setCurrentView] = useState<'dashboard' | 'users'>('dashboard');
+
+  useEffect(() => {
+    if (!user || !businessId) return;
+
+    const q = query(
+      collection(db, 'expenses'),
+      where('businessId', '==', businessId),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setExpenses(docs);
+      setLoadingExpenses(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, businessId]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const storageRef = ref(storage, `receipts/${user.uid}/${Date.now()}_${file.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setUploadProgress(progress);
+      },
+      (error) => {
+        console.error("Upload failed", error);
+        setUploadProgress(null);
+      },
+      async () => {
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        console.log("File available at", downloadURL);
+        setUploadProgress(null);
+
+        // Trigger OCR API
+        try {
+          const response = await fetch('/api/ocr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl: downloadURL })
+          });
+          const result = await response.json();
+          if (result.success) {
+            setOcrResult({ ...result.data, imageUrl: downloadURL });
+            setIsReviewing(true);
+          }
+        } catch (err) {
+          console.error("OCR API failed", err);
+        }
+      }
+    );
+  };
+
+  const triggerUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const saveExpense = async (finalData: any) => {
+    if (!user || !businessId) return;
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, 'expenses'), {
+        ...finalData,
+        userId: user.uid,
+        userName: user.displayName,
+        businessId: businessId,
+        createdAt: serverTimestamp(),
+      });
+      setIsReviewing(false);
+      setOcrResult(null);
+      // Optional: Trigger a refresh of the dashboard table
+    } catch (error) {
+      console.error("Error saving expense", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const [isSendingReport, setIsSendingReport] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  // New Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('הכל');
+
+  const filteredExpenses = expenses.filter(exp => {
+    const matchesSearch = exp.supplier?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      exp.category?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = activeCategory === 'הכל' || exp.category === activeCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  const handleExport = () => {
+    if (filteredExpenses.length === 0) {
+      setNotification({ type: 'error', message: 'אין נתונים לייצוא' });
+      return;
+    }
+
+    const dataToExport = filteredExpenses.map(exp => ({
+      'תאריך': exp.date,
+      'ספק': exp.supplier,
+      'קטגוריה': exp.category,
+      'סכום': exp.total,
+      'מזהה': exp.id
+    }));
+
+    const ws = utils.json_to_sheet(dataToExport);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "הוצאות");
+    writeFile(wb, `Report_${new Date().toLocaleDateString('he-IL')}.xlsx`);
+
+    setNotification({ type: 'success', message: 'קובץ Excel נוצר בהצלחה!' });
+  };
+
+  const sendReportToAccountant = async () => {
+    // ... rest of the function ...
+    if (filteredExpenses.length === 0) {
+      setNotification({ type: 'error', message: 'אין נתונים לשליחה' });
+      return;
+    }
+    setIsSendingReport(true);
+    try {
+      const response = await fetch('/api/send-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expenses: filteredExpenses,
+          userEmail: user?.email,
+          userName: user?.displayName
+        }),
+      });
+      // ... rest of the catch/finally ...
+      const result = await response.json();
+      if (result.success) {
+        setNotification({ type: 'success', message: 'הדו״ח נשלח בהצלחה לרואה החשבון!' });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Error sending report", error);
+      setNotification({ type: 'error', message: 'שגיאה בשליחת הדו״ח. נסה שוב מאוחר יותר.' });
+    } finally {
+      setIsSendingReport(false);
+    }
+  };
+
+  const monthlyTotal = expenses.reduce((sum, exp) => sum + (exp.total || 0), 0);
+  const invoiceCount = expenses.length;
+
+  // Analytics Data Preparation
+  const categoryData = Object.entries(
+    filteredExpenses.reduce((acc, exp) => {
+      acc[exp.category] = (acc[exp.category] || 0) + exp.total;
+      return acc;
+    }, {} as Record<string, number>)
+  ).map(([name, value]) => ({ name, value: value as number })).sort((a, b) => b.value - a.value);
+
+  const timeData = Object.entries(
+    filteredExpenses.reduce((acc, exp) => {
+      const dateParts = typeof exp.date === 'string' ? exp.date.split(/[/\.-]/) : [];
+      const dateStr = dateParts.length >= 2 ? `${dateParts[0]}/${dateParts[1]}` : (exp.date || 'לא ידוע');
+      acc[dateStr] = (acc[dateStr] || 0) + exp.total;
+      return acc;
+    }, {} as Record<string, number>)
+  ).map(([date, total]) => ({ date, total }));
+
+  const PIE_COLORS = ['#10B981', '#3B82F6', '#EF4444', '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6'];
+
+  return (
+    <div className="bg-[var(--color-background)] text-[var(--color-text-main)] min-h-screen relative overflow-x-hidden font-display" dir="rtl">
+      {/* Notifications */}
+      {notification && (
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full border backdrop-blur-md shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300 flex items-center gap-3 ${notification.type === 'success'
+          ? 'bg-[var(--color-primary)]/10 border-[var(--color-primary)]/50 text-[var(--color-primary)]'
+          : 'bg-[var(--color-danger)]/10 border-[var(--color-danger)]/50 text-[var(--color-danger)]'
+          }`}>
+          <div className={`w-2 h-2 rounded-full ${notification.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-danger)]'} animate-pulse`}></div>
+          <span className="text-sm font-bold">{notification.message}</span>
+        </div>
+      )}
+
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*,application/pdf"
+        onChange={handleFileUpload}
+      />
+
+      {/* Upload Progress Indicator */}
+      {uploadProgress !== null && (
+        <div className="fixed top-0 left-0 w-full h-1 z-[100] bg-white/10">
+          <div
+            className="h-full bg-[var(--color-primary)] transition-all duration-300 shadow-[0_0_10px_var(--color-primary)]"
+            style={{ width: `${uploadProgress}%` }}
+          ></div>
+        </div>
+      )}
+
+      {/* Cyberpunk Background Effect */}
+      <div className="fixed inset-0 pointer-events-none opacity-40 bg-[linear-gradient(to_right,rgba(13,242,128,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(13,242,128,0.05)_1px,transparent_1px)] bg-[size:30px_30px]"></div>
+      <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[var(--color-primary)]/10 blur-[120px] rounded-full pointer-events-none"></div>
+
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* Header / Top Bar */}
+        <header className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-md border-b border-white/10 sticky top-0 z-40">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[var(--color-primary)]/20 flex items-center justify-center border border-[var(--color-primary)]/40 overflow-hidden">
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                <Receipt className="w-6 h-6 text-[var(--color-primary)]" />
+              )}
+            </div>
+            <div>
+              <h1 className="text-sm font-medium text-[var(--color-text-muted)]">{businessName || 'בסטרסט BestRest'}</h1>
+              <h2 className="text-lg font-bold leading-none">שלום, {user?.displayName?.split(' ')[0] || 'מנהל משמרת'}</h2>
+            </div>
+          </div>
+          {role !== 'accountant' && (
+            <button
+              onClick={triggerUpload}
+              className="bg-[var(--color-primary)] text-[var(--color-background)] py-2 px-3 md:px-4 rounded-lg font-bold text-sm flex items-center gap-2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:brightness-110 transition-all"
+            >
+              <Plus className="w-5 h-5 hidden md:block" />
+              <Plus className="w-5 h-5 md:hidden" />
+              <span className="hidden md:inline">הוסף חשבונית</span>
+            </button>
+          )}
+        </header>
+
+        <main className="flex-1 p-4 pb-24 space-y-6 max-w-7xl mx-auto w-full">
+          {currentView === 'dashboard' ? (
+            <>
+              {/* KPI Cards Section */}
+              <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-primary)]"></div>
+                  <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">הוצאות החודש</p>
+                  <h3 className="text-2xl font-black">₪{monthlyTotal.toLocaleString()}</h3>
+                  <div className="mt-2 flex items-center gap-1 text-[var(--color-primary)] text-[10px] font-bold">
+                    <span className="bg-[var(--color-primary)]/10 px-1.5 py-0.5 rounded">+12.5%</span>
+                  </div>
+                </div>
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl">
+                  <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">חשבוניות שנסרקו</p>
+                  <h3 className="text-2xl font-black">{invoiceCount}</h3>
+                  <p className="text-[10px] text-[var(--color-text-muted)] mt-2">סה״כ החודש</p>
+                </div>
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl md:block hidden">
+                  <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">ספק מוביל</p>
+                  <h3 className="text-lg font-bold">תנובה</h3>
+                  <p className="text-[10px] text-[var(--color-primary)] mt-1">₪12,450 (28%)</p>
+                </div>
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl md:block hidden relative group overflow-hidden">
+                  <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">סטטוס רו״ח</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+                    <h3 className="text-sm font-bold">ממתין לסגירה</h3>
+                  </div>
+                  <button
+                    onClick={sendReportToAccountant}
+                    disabled={isSendingReport || filteredExpenses.length === 0}
+                    className="mt-3 w-full bg-[var(--color-primary)]/10 hover:bg-[var(--color-primary)]/20 text-[var(--color-primary)] border border-[var(--color-primary)]/30 py-1.5 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isSendingReport ? 'שולח...' : 'שלח לרואה חשבון'}
+                  </button>
+                </div>
+              </section>
+
+              {/* Analytics Charts Section */}
+              <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl h-80 flex flex-col">
+                  <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
+                    התפלגות הוצאות
+                  </h3>
+                  <div className="flex-1 min-h-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={categoryData}
+                          innerRadius={60}
+                          outerRadius={90}
+                          paddingAngle={5}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          {categoryData.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          formatter={(value: number | undefined) => `₪${(value || 0).toLocaleString()}`}
+                          contentStyle={{ backgroundColor: '#1E293B', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
+                          itemStyle={{ color: '#fff' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl h-80 flex flex-col">
+                  <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[var(--color-secondary)]"></span>
+                    מגמת הוצאות
+                  </h3>
+                  <div className="flex-1 min-h-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={timeData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                        <XAxis dataKey="date" stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(value) => `₪${value}`} width={50} />
+                        <RechartsTooltip
+                          formatter={(value: number | undefined) => `₪${(value || 0).toLocaleString()}`}
+                          cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                          contentStyle={{ backgroundColor: '#1E293B', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
+                        />
+                        <Bar dataKey="total" fill="var(--color-primary)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </section>
+
+              {/* Filters & Actions Bar */}
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl">
+                <div className="relative w-full md:w-96">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
+                  <input
+                    type="text"
+                    placeholder="חיפוש ספק או קטגוריה..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pr-10 pl-4 text-sm focus:outline-none focus:border-[var(--color-primary)]/50 transition-colors"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+                  {['הכל', 'מזון', 'שתייה', 'ניקיון', 'כללי'].map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${activeCategory === cat
+                        ? 'bg-[var(--color-primary)] text-slate-900 shadow-[0_0_10px_rgba(13,242,128,0.3)]'
+                        : 'bg-white/5 text-[var(--color-text-muted)] hover:bg-white/10'
+                        }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleExport}
+                  className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-4 py-2 rounded-xl text-sm font-bold transition-all w-full md:w-auto justify-center"
+                >
+                  <Download className="w-4 h-4 text-[var(--color-primary)]" />
+                  ייצוא לאקסל
+                </button>
+              </div>
+
+              {/* Recent Activity Table Section */}
+              <section className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-lg font-bold flex items-center gap-2">
+                    <Receipt className="w-5 h-5 text-[var(--color-primary)]" />
+                    חשבוניות {searchQuery || activeCategory !== 'הכל' ? 'מסוננות' : 'אחרונות'}
+                  </h3>
+                  <button className="text-[var(--color-primary)] text-sm font-medium hover:underline cursor-pointer">הצג הכל</button>
+                </div>
+
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-right border-collapse">
+                      <thead className="bg-white/5 text-[var(--color-text-muted)] text-xs uppercase">
+                        <tr>
+                          <th className="p-4 font-semibold whitespace-nowrap">ספק</th>
+                          <th className="p-4 font-semibold whitespace-nowrap">קטגוריה</th>
+                          <th className="p-4 font-semibold whitespace-nowrap">סכום</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {loadingExpenses ? (
+                          <tr>
+                            <td colSpan={3} className="p-8 text-center">
+                              <div className="inline-block w-6 h-6 border-2 border-white/10 border-t-[var(--color-primary)] rounded-full animate-spin"></div>
+                            </td>
+                          </tr>
+                        ) : filteredExpenses.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="p-8 text-center text-[var(--color-text-muted)] text-sm italic">
+                              {expenses.length === 0 ? 'טרם נוספו חשבוניות' : 'לא נמצאו תוצאות לסינון הנוכחי'}
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredExpenses.map((expense) => (
+                            <tr key={expense.id} className="hover:bg-white/5 transition-colors group">
+                              <td className="p-4 whitespace-nowrap">
+                                <div className="flex flex-col">
+                                  <span className="font-bold text-sm text-white group-hover:text-[var(--color-primary)] transition-colors">{expense.supplier}</span>
+                                  <span className="text-[10px] text-[var(--color-text-muted)]">{expense.date}</span>
+                                </div>
+                              </td>
+                              <td className="p-4 whitespace-nowrap">
+                                <span className="px-2 py-1 rounded bg-[var(--color-surface)] text-[10px] text-gray-300">{expense.category}</span>
+                              </td>
+                              <td className="p-4 font-bold text-[var(--color-primary)] whitespace-nowrap">₪{expense.total?.toLocaleString()}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            </>
+          ) : (
+            <UsersManagement />
+          )}
+        </main>
+
+        {/* Bottom Navigation Bar */}
+        <nav className="fixed bottom-0 inset-x-0 bg-white/5 backdrop-blur-md border-t border-white/10 px-6 py-3 z-50 rounded-t-2xl">
+          <div className="flex items-center justify-between max-w-md mx-auto relative">
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'dashboard' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+            >
+              <LayoutDashboard className="w-6 h-6" />
+              <span className="text-[10px] font-bold">דשבורד</span>
+            </button>
+            <button className="flex flex-col items-center gap-1 text-[var(--color-text-muted)] h-full">
+              <Receipt className="w-6 h-6" />
+              <span className="text-[10px] font-medium">קבלות</span>
+            </button>
+
+            {role !== 'accountant' && (
+              <button
+                onClick={triggerUpload}
+                className="bg-[var(--color-primary)] text-slate-900 p-3 rounded-full absolute -top-10 left-1/2 -translate-x-1/2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:scale-110 transition-transform active:scale-95"
+              >
+                <Plus className="w-6 h-6" />
+              </button>
+            )}
+
+            <button
+              onClick={() => setCurrentView('users')}
+              className={`flex flex-col items-center gap-1 transition-colors ml-12 ${currentView === 'users' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+            >
+              <Settings className="w-6 h-6" />
+              <span className="text-[10px] font-medium">{role === 'admin' ? 'משתמשים' : 'הגדרות'}</span>
+            </button>
+            <button onClick={logout} className="flex flex-col items-center gap-1 text-[var(--color-text-muted)]">
+              <LogOut className="w-6 h-6" />
+              <span className="text-[10px] font-medium">התנתק</span>
+            </button>
+          </div>
+        </nav>
+
+        {/* Review Modal */}
+        {isReviewing && ocrResult && (
+          <ReviewModal
+            data={ocrResult}
+            isSaving={isSaving}
+            onClose={() => setIsReviewing(false)}
+            onSave={saveExpense}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UsersManagement() {
+  const { role, businessId } = useAuth();
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  if (role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center space-y-4 bg-white/5 rounded-2xl border border-white/10">
+        <Settings className="w-12 h-12 text-orange-500 animate-pulse" />
+        <h3 className="text-xl font-bold">גישה מוגבלת</h3>
+        <p className="text-[var(--color-text-muted)] text-sm">רק מנהלי מערכת רשאים לנהל משתמשים והרשאות.</p>
+      </div>
+    );
+  }
+
+  useEffect(() => {
+    if (!businessId) return;
+    const q = query(
+      collection(db, 'users'),
+      where('businessId', '==', businessId),
+      orderBy('createdAt', 'desc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUsers(docs);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [businessId]);
+
+  const updateUserRole = async (userId: string, newRole: string) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await setDoc(userRef, { role: newRole }, { merge: true });
+    } catch (error) {
+      console.error("Error updating role:", error);
+    }
+  };
+
+  return (
+    <section className="space-y-6">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-xl font-bold flex items-center gap-2">
+          <Users className="w-6 h-6 text-[var(--color-primary)]" />
+          ניהול משתמשים והרשאות
+        </h3>
+      </div>
+
+      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-right border-collapse">
+            <thead className="bg-white/5 text-[var(--color-text-muted)] text-xs uppercase">
+              <tr>
+                <th className="p-4 font-semibold">משתמש</th>
+                <th className="p-4 font-semibold">אימייל</th>
+                <th className="p-4 font-semibold">תפקיד</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {loading ? (
+                <tr>
+                  <td colSpan={3} className="p-8 text-center">
+                    <div className="inline-block w-6 h-6 border-2 border-white/10 border-t-[var(--color-primary)] rounded-full animate-spin"></div>
+                  </td>
+                </tr>
+              ) : users.map((u) => (
+                <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                  <td className="p-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      {u.photoURL ? (
+                        <img src={u.photoURL} alt="" className="w-8 h-8 rounded-full border border-white/10" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-[10px] uppercase">
+                          {u.displayName?.substring(0, 2) || '??'}
+                        </div>
+                      )}
+                      <span className="font-bold text-sm text-white">{u.displayName}</span>
+                    </div>
+                  </td>
+                  <td className="p-4 text-sm text-[var(--color-text-muted)] whitespace-nowrap">{u.email}</td>
+                  <td className="p-4 whitespace-nowrap">
+                    <select
+                      value={u.role}
+                      onChange={(e) => updateUserRole(u.id, e.target.value)}
+                      className="bg-black/20 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-[var(--color-primary)] transition-colors"
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="manager">Manager</option>
+                      <option value="accountant">Accountant</option>
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+        <p className="text-xs text-orange-400 flex items-center gap-2">
+          <Settings className="w-4 h-4" />
+          שים לב: שינוי תפקיד משפיע על הרשאות הגישה של המשתמש מיידית.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ReviewModal({ data, isSaving, onClose, onSave }: { data: any, isSaving: boolean, onClose: () => void, onSave: (data: any) => void }) {
+  const [editedData, setEditedData] = useState(data);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300" dir="rtl">
+      <div className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col md:flex-row shadow-2xl">
+
+        {/* Left: Receipt Preview */}
+        <div className="w-full md:w-1/2 bg-black/40 flex items-center justify-center p-4 overflow-auto">
+          <img src={data.imageUrl} alt="Receipt Preview" className="max-w-full h-auto rounded shadow-lg" />
+        </div>
+
+        {/* Right: Data Entry Form */}
+        <div className="w-full md:w-1/2 p-6 flex flex-col space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Receipt className="w-6 h-6 text-[var(--color-primary)]" />
+              אימות נתוני חשבונית
+            </h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+              <Plus className="w-6 h-6 rotate-45" />
+            </button>
+          </div>
+
+          <div className="space-y-4 flex-1 overflow-auto px-1">
+            <div className="space-y-2">
+              <label className="text-xs text-[var(--color-text-muted)] font-medium">ספק / עסק</label>
+              <input
+                type="text"
+                value={editedData.supplier}
+                onChange={(e) => setEditedData({ ...editedData, supplier: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs text-[var(--color-text-muted)] font-medium">סכום כולל (₪)</label>
+                <input
+                  type="number"
+                  value={editedData.total}
+                  onChange={(e) => setEditedData({ ...editedData, total: parseFloat(e.target.value) })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-[var(--color-text-muted)] font-medium">תאריך</label>
+                <input
+                  type="text"
+                  value={editedData.date}
+                  onChange={(e) => setEditedData({ ...editedData, date: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs text-[var(--color-text-muted)] font-medium">קטגוריה</label>
+              <select
+                value={editedData.category}
+                onChange={(e) => setEditedData({ ...editedData, category: e.target.value })}
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors appearance-none"
+              >
+                <option value="חומרי גלם">חומרי גלם</option>
+                <option value="שתייה">שתייה</option>
+                <option value="אלכוהול">אלכוהול</option>
+                <option value="ציוד">ציוד</option>
+                <option value="תחזוקה">תחזוקה</option>
+                <option value="שכירות">שכירות</option>
+                <option value="עובדים">עובדים</option>
+                <option value="כללי">כללי</option>
+              </select>
+            </div>
+
+            <div className="pt-4 border-t border-white/5">
+              <p className="text-[10px] text-[var(--color-text-muted)] mb-2 font-mono uppercase tracking-[2px]">AI Raw Transcription</p>
+              <div className="bg-black/20 rounded p-3 text-[10px] text-gray-500 max-h-32 overflow-auto font-mono leading-relaxed">
+                {data.rawText}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-4 pt-4">
+            <button
+              onClick={() => onSave(editedData)}
+              disabled={isSaving}
+              className="flex-1 bg-[var(--color-primary)] text-slate-900 font-bold py-3 rounded-lg hover:brightness-110 shadow-[0_0_20px_rgba(13,242,128,0.3)] transition-all disabled:opacity-50"
+            >
+              {isSaving ? 'שומר...' : 'אישור ושמירה'}
+            </button>
+            <button
+              onClick={onClose}
+              disabled={isSaving}
+              className="px-6 py-3 border border-white/10 text-white font-medium rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MainApp() {
+  const { user, completedOnboarding, loading } = useAuth();
+  console.log("MainApp Render:", { user: !!user, completedOnboarding, loading });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--color-background)] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-white/10 border-t-[var(--color-primary)] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user) return <Login />;
+  if (!completedOnboarding) return <Onboarding />;
+
+  return <Dashboard />;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
+  );
+}
