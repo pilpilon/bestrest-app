@@ -1,14 +1,11 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import vision from '@google-cloud/vision';
+import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
 
-// Initialize the Vision client
-// In production, GOOGLE_APPLICATION_CREDENTIALS_JSON should be set in Vercel environment variables
+// Initialize the Document AI client
 const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-if (!credentialsJson) {
-    console.warn('WARNING: GOOGLE_APPLICATION_CREDENTIALS_JSON is not set in environment variables.');
-}
+const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
 
-const client = new vision.ImageAnnotatorClient({
+const client = new DocumentProcessorServiceClient({
     credentials: credentialsJson ? JSON.parse(credentialsJson) : undefined,
 });
 
@@ -23,15 +20,119 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Missing imageUrl or imageBase64' });
     }
 
+    // Try Document AI first if configured
+    if (credentialsJson && processorId) {
+        try {
+            const credentials = JSON.parse(credentialsJson);
+            const projectId = credentials.project_id;
+            const location = 'eu'; // Recommended location for Israel
+            const name = `projects/${projectId}/locations/${location}/processors/${processorId}`;
+
+            const request = {
+                name,
+                rawDocument: {
+                    content: imageBase64,
+                    mimeType: mimeType || 'image/jpeg',
+                },
+            };
+
+            console.log('Processing document with Document AI...');
+            const [result] = await client.processDocument(request);
+            const { document } = result;
+
+            if (!document) {
+                throw new Error('No document returned from Document AI');
+            }
+
+            const entities = document.entities || [];
+
+            // Helper to get entity value
+            const getEntityValue = (type: string) => {
+                const entity = entities.find(e => e.type === type);
+                if (!entity) return null;
+                return entity.normalizedValue?.text || entity.mentionText;
+            };
+
+            const extractedSupplier = getEntityValue('supplier_name') || "לא זוהה";
+
+            // Extract total amount as a number
+            let extractedTotal = 0;
+            const totalEntity = entities.find(e => e.type === 'total_amount');
+            if (totalEntity) {
+                if (totalEntity.normalizedValue?.moneyValue) {
+                    const units = Number(totalEntity.normalizedValue.moneyValue.units) || 0;
+                    const nanos = (totalEntity.normalizedValue.moneyValue.nanos || 0) / 1000000000;
+                    extractedTotal = units + nanos;
+                } else {
+                    const textValue = totalEntity.normalizedValue?.text || totalEntity.mentionText || "0";
+                    extractedTotal = parseFloat(textValue.replace(/[^\d.]/g, '')) || 0;
+                }
+            }
+
+            const extractedDate = getEntityValue('invoice_date') || new Date().toLocaleDateString('he-IL');
+            const rawText = document.text || "";
+
+            let parsedData = {
+                supplier: extractedSupplier,
+                total: extractedTotal,
+                date: extractedDate,
+                category: "כללי"
+            };
+
+            // Use Gemini for categorization
+            if (process.env.GEMINI_API_KEY) {
+                try {
+                    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+                    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+                    const model = genAI.getGenerativeModel({
+                        model: "gemini-2.0-flash", // Using 2.0 flash for speed and reliability
+                        generationConfig: { responseMimeType: "application/json" }
+                    });
+
+                    const prompt = `
+Based on the following supplier name and receipt text, determine the best expense category.
+Supplier: ${extractedSupplier}
+Full Text Snippet: ${rawText.substring(0, 500)}
+
+Respond ONLY with this JSON:
+{
+  "category": "One of: חומרי גלם, שתייה, אלכוהול, ציוד, תחזוקה, שכירות, עובדים, כללי"
+}
+`;
+                    const geminiResult = await model.generateContent(prompt);
+                    const responseText = geminiResult.response.text();
+                    const extractedJson = JSON.parse(responseText);
+                    parsedData.category = extractedJson.category || "כללי";
+                } catch (geminiError) {
+                    console.error('Gemini Categorization Error:', geminiError);
+                }
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    ...parsedData,
+                    rawText: rawText.substring(0, 1000) // Truncate for display
+                }
+            });
+
+        } catch (docAIError) {
+            console.error('Document AI Error, falling back to Vision:', docAIError);
+        }
+    }
+
+    // Fallback to legacy Vision API if Document AI is not configured or fails
     try {
-        // Build the image descriptor for Vision API
-        // Prefer base64 (direct upload) over URL to avoid CORS / auth issues
+        const vision = await import('@google-cloud/vision');
+        const visionClient = new vision.default.ImageAnnotatorClient({
+            credentials: credentialsJson ? JSON.parse(credentialsJson) : undefined,
+        });
+
         const imageInput = imageBase64
             ? { content: imageBase64 }
             : { source: { imageUri: imageUrl } };
 
-        // Perform text detection
-        const [result] = await client.textDetection({ image: imageInput });
+        const [result] = await visionClient.textDetection({ image: imageInput });
         const detections = result.textAnnotations;
 
         if (!detections || detections.length === 0) {
@@ -61,26 +162,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const { GoogleGenerativeAI } = await import('@google/generative-ai');
                 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
                 const model = genAI.getGenerativeModel({
-                    model: "gemini-2.5-flash",
+                    model: "gemini-1.5-flash",
                     generationConfig: { responseMimeType: "application/json" }
                 });
 
                 const prompt = `
-Extract the following details from this Israeli restaurant receipt text. 
-Respond ONLY with a valid JSON object matching exactly this schema:
+Extract details from this Israeli receipt. Respond ONLY with JSON:
 {
-  "supplier": "Name of the business/supplier (usually at the top)",
-  "total": 123.45, // Number, the final total amount to pay
-  "date": "dd/mm/yyyy", // Extract the date. Use today if missing.
+  "supplier": "string",
+  "total": number,
+  "date": "dd/mm/yyyy",
   "category": "One of: חומרי גלם, שתייה, אלכוהול, ציוד, תחזוקה, שכירות, עובדים, כללי"
 }
-
-Receipt text:
-${rawText}
+Text: ${rawText}
 `;
                 const geminiResult = await model.generateContent(prompt);
-                const responseText = geminiResult.response.text();
-                const extractedJson = JSON.parse(responseText);
+                const extractedJson = JSON.parse(geminiResult.response.text());
 
                 parsedData = {
                     supplier: extractedJson.supplier || "לא זוהה",
@@ -88,35 +185,18 @@ ${rawText}
                     date: extractedJson.date || new Date().toLocaleDateString('he-IL'),
                     category: extractedJson.category || "כללי"
                 };
-            } catch (geminiError) {
-                console.error('Gemini Parsing Error - falling back to basic parsing:', geminiError);
-                // Fallback implemented below
+            } catch (err) {
+                console.error('Legacy Parse Error:', err);
             }
-        }
-
-        // Fallback or if Gemini not configured yet
-        if (parsedData.total === 0 && parsedData.supplier === "לא זוהה") {
-            const lines = rawText.split('\n');
-            parsedData.supplier = lines[0] || "לא זוהה";
-
-            const totalMatch = rawText.match(/(?:סה["״]כ|Total|סכום)\s*[:]?\s*(\d+(?:\.\d{1,2})?)/i);
-            parsedData.total = totalMatch ? parseFloat(totalMatch[1]) : 0;
-
-            const dateMatch = rawText.match(/(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})/);
-            parsedData.date = dateMatch ? dateMatch[1] : new Date().toLocaleDateString('he-IL');
-            parsedData.category = "בתהליך...";
         }
 
         return res.status(200).json({
             success: true,
-            data: {
-                ...parsedData,
-                rawText
-            }
+            data: { ...parsedData, rawText }
         });
 
     } catch (error) {
-        console.error('OCR Error:', error);
+        console.error('General OCR Error:', error);
         return res.status(500).json({ error: 'Failed to process image: ' + (error as Error).message });
     }
 }
