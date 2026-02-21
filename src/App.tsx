@@ -1,5 +1,4 @@
 import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Login } from './Login';
@@ -202,35 +201,34 @@ function Dashboard() {
   }, [notification]);
 
   const handleExport = () => {
-    console.log("HandleExport triggered. Expenses:", filteredExpenses.length);
     if (filteredExpenses.length === 0) {
       setNotification({ type: 'error', message: 'אין נתונים לייצוא' });
       return;
     }
     try {
-      const dataToExport = filteredExpenses.map(exp => ({
-        'תאריך': exp.date,
-        'ספק': exp.supplier,
-        'קטגוריה': exp.category,
-        'סכום': exp.total,
-        'נשלח': exp.isSent ? 'כן' : 'לא',
-      }));
-
-      console.log("Creating Excel sheet...");
-      const ws = XLSX.utils.json_to_sheet(dataToExport);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "הוצאות");
+      // BOM + CSV rows for proper Hebrew rendering in Excel
+      const BOM = '\uFEFF';
+      const headers = ['תאריך', 'ספק', 'קטגוריה', 'סכום', 'נשלח לרו"ח'];
+      const rows = filteredExpenses.map(exp =>
+        [exp.date, exp.supplier, exp.category, exp.total, exp.isSent ? 'כן' : 'לא'].join(',')
+      );
+      const csvContent = BOM + [headers.join(','), ...rows].join('\n');
 
       const dateStr = new Date().toISOString().slice(0, 10);
-      const fileName = `BestRest_Report_${dateStr}.xlsx`;
+      const fileName = `BestRest_Report_${dateStr}.csv`;
 
-      console.log("Triggering XLSX.writeFile:", fileName);
-      XLSX.writeFile(wb, fileName);
+      // Use data: URI — works in every browser without any library
+      const link = document.createElement('a');
+      link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-      setNotification({ type: 'success', message: 'קובץ Excel נוצר בהצלחה!' });
+      setNotification({ type: 'success', message: 'קובץ CSV נוצר (נפתח ב-Excel) ✓' });
     } catch (err) {
-      console.error('CRITICAL Excel export error:', err);
-      setNotification({ type: 'error', message: 'שגיאה חמורה בייצוא. בדוק קונסול.' });
+      console.error('Export error:', err);
+      setNotification({ type: 'error', message: 'שגיאה בייצוא. נסה שוב.' });
     }
   };
 
