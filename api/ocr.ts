@@ -83,7 +83,7 @@ ${rawText.substring(0, 3000)}
 }
 
 // Helper: extract line items from the original invoice IMAGE using Vision
-async function extractLineItemsFromImage(imageBase64: string, imageMimeType: string): Promise<any[]> {
+async function extractLineItemsFromImage(imageBase64: string, imageMimeType: string, rawTextFallback?: string): Promise<any[]> {
     try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -92,40 +92,64 @@ async function extractLineItemsFromImage(imageBase64: string, imageMimeType: str
             generationConfig: { responseMimeType: "application/json" }
         });
 
-        const prompt = `You are reading an Israeli invoice/receipt IMAGE. 
+        const prompt = `You are reading an Israeli invoice/receipt IMAGE.
 Extract every line item (product row) from the table in this invoice.
 
 Look at the COLUMNS in the invoice table carefully:
 - Find the product name column
-- Find the quantity column (כמות / מס"\u05e4 / יח')
-- Find the unit price column (מחיר / מחיר ליחידה)
-- Find the total column (סכום / סה"כ)
+- Find the quantity column (\u05db\u05de\u05d5\u05ea / \u05de\u05e1"\u05e4 / \u05d9\u05d7')
+- Find the unit price column (\u05de\u05d7\u05d9\u05e8 / \u05de\u05d7\u05d9\u05e8 \u05dc\u05d9\u05d7\u05d9\u05d3\u05d4 / \u05e9"\u05de \u05dc\u05d9\u05d7\u05d9\u05d3\u05d4)
+- Find the total column (\u05e1\u05db\u05d5\u05dd / \u05e1\u05d4"\u05db / \u05e9"\u05db)
 
-CRITICAL RULES:
-- "quantity": This is the NUMBER OF UNITS ORDERED (how many items). Look at the qty/כמות column specifically. On Israeli invoices it often appears as "X 2" or in a dedicated column. Do NOT use the product weight/size from the product name.
-- "unit": Use ONLY one of: יח', ק"ג, גרם, ליטר, מ"ל, ארגז, מארז
-- "name": Full product name in Hebrew as shown on the invoice
-- "pricePerUnit": The price for ONE unit
-- "totalPrice": The line total (quantity × pricePerUnit)
+CRITICAL: "quantity" = number of units ORDERED (the qty column, e.g. X 2 or 2 \u05d9\u05d7'), NOT the product size/weight in the name.
+Units must be one of: \u05d9\u05d7', \u05e7"\u05d2, \u05d2\u05e8\u05dd, \u05dc\u05d9\u05d8\u05e8, \u05de"\u05dc, \u05d0\u05e8\u05d2\u05d6, \u05de\u05d0\u05e8\u05d6
 
-Return ONLY a valid JSON array:
-[{"name": "וודקה סמירנוף ליטר", "quantity": 2, "unit": "יח'", "pricePerUnit": 89.90, "totalPrice": 179.80}]
+Return ONLY valid JSON array (no markdown, no code blocks):
+[{"name": "\u05d5\u05d5\u05d3\u05e7\u05d4 \u05e1\u05de\u05d9\u05e8\u05e0\u05d5\u05e3 \u05dc\u05d9\u05d8\u05e8", "quantity": 2, "unit": "\u05d9\u05d7'", "pricePerUnit": 89.90, "totalPrice": 179.80}]
 If no items found, return [].`;
 
         const result = await model.generateContent([
             prompt,
-            {
-                inlineData: {
-                    data: imageBase64,
-                    mimeType: imageMimeType
-                }
-            }
+            { inlineData: { data: imageBase64, mimeType: imageMimeType } }
         ]);
 
-        const parsed = JSON.parse(result.response.text());
-        return Array.isArray(parsed) ? parsed : (parsed?.items || parsed?.lineItems || []);
+        let responseText = result.response.text().trim();
+        // Strip markdown code blocks Gemini sometimes adds
+        responseText = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+        console.log("Vision line-items response (200 chars):", responseText.substring(0, 200));
+
+        const parsed = JSON.parse(responseText);
+        const items = Array.isArray(parsed) ? parsed : (parsed?.items || parsed?.lineItems || []);
+        console.log(`Vision extracted ${items.length} line items`);
+        return items;
     } catch (err) {
-        console.error("Vision line-item extraction failed:", err);
+        console.error("Vision extraction failed, falling back to text:", err);
+        if (rawTextFallback) return extractLineItemsFromText(rawTextFallback);
+        return [];
+    }
+}
+
+// Text-based fallback — less accurate but more robust
+async function extractLineItemsFromText(rawText: string): Promise<any[]> {
+    try {
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.0-flash",
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        const result = await model.generateContent(
+            `Extract line items from this Israeli invoice text. Return ONLY JSON array (no markdown):
+[{"name":"Product","quantity":2,"unit":"\u05d9\u05d7'","pricePerUnit":50,"totalPrice":100}]
+IMPORTANT: quantity = units ordered (X 2 / 2 \u05d9\u05d7'), NOT product weight in name. Units: \u05d9\u05d7', \u05e7"\u05d2, \u05d2\u05e8\u05dd, \u05dc\u05d9\u05d8\u05e8, \u05de"\u05dc, \u05d0\u05e8\u05d2\u05d6, \u05de\u05d0\u05e8\u05d6
+If none found return [].
+Text:\n${rawText.substring(0, 3000)}`
+        );
+        let text = result.response.text().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        console.error("Text fallback extraction also failed:", err);
         return [];
     }
 }
@@ -238,13 +262,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
 
             // Extract line items from IMAGE (not text) for accurate table reading
-            parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg');
+            parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg', rawText);
         } else {
             // Full parse with Gemini (text-based for header fields)
             console.log("Document AI entities missing, using Gemini full parse");
             parsed = await parseWithGemini(rawText);
             // Override line items with Vision-based extraction for accuracy
-            parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg');
+            parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg', rawText);
         }
 
         return res.status(200).json({
