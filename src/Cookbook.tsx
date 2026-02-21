@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Search, ChevronLeft, ChefHat, Info, Trash2, Target, TrendingUp } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Search, ChevronLeft, ChefHat, Info, Trash2, Target, TrendingUp, Camera, Loader2 } from 'lucide-react';
 import { RecipeBuilder } from './RecipeBuilder';
 import type { Recipe } from './RecipeBuilder';
 import { useAuth } from './AuthContext';
@@ -13,6 +13,9 @@ export function Cookbook() {
     const [isBuilding, setIsBuilding] = useState(false);
     const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+
+    const menuInputRef = useRef<HTMLInputElement>(null);
+    const [isScanningMenu, setIsScanningMenu] = useState(false);
 
     // Profit Calculator State
     const [targetProfit, setTargetProfit] = useState<string>('');
@@ -60,6 +63,51 @@ export function Cookbook() {
         await deleteDoc(doc(db, 'businesses', businessId, 'recipes', id));
     };
 
+    const handleBulkMenuScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !businessId) return;
+
+        setIsScanningMenu(true);
+        try {
+            const base64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                reader.readAsDataURL(file);
+            });
+
+            const response = await fetch('/api/ocr-menu', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageBase64: base64, mimeType: file.type })
+            });
+            const result = await response.json();
+
+            if (result.success && result.data.dishes) {
+                const dishes = result.data.dishes;
+                // Add all dishes sequentially
+                for (const dish of dishes) {
+                    await handleSaveRecipe({
+                        name: dish.name,
+                        targetPrice: parseFloat(dish.price) || 0,
+                        calculatedCost: 0,
+                        ingredients: [],
+                        ingredientsCount: 0,
+                        lastUpdated: new Date().toLocaleDateString('he-IL')
+                    });
+                }
+                alert(`נוספו ${dishes.length} מנות חדשות בהצלחה!`);
+            } else {
+                alert('לא הצלחנו לזהות מנות בתפריט. נסה תמונה ברורה יותר.');
+            }
+        } catch (err) {
+            console.error("Menu scan failed:", err);
+            alert('שגיאה בסריקת התפריט.');
+        } finally {
+            setIsScanningMenu(false);
+            if (menuInputRef.current) menuInputRef.current.value = '';
+        }
+    };
+
     const filteredRecipes = recipes.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Profit Calculation Logic
@@ -96,13 +144,24 @@ export function Cookbook() {
                         נהל את המנות שלך. המערכת תחשב אוטומטית את העלות האמיתית לפי הקבלות שנסרקו.
                     </p>
                 </div>
-                <button
-                    onClick={() => setIsBuilding(true)}
-                    className="bg-[var(--color-primary)] text-slate-900 py-2.5 px-6 rounded-xl font-bold text-sm flex items-center gap-2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:brightness-110 transition-all shrink-0"
-                >
-                    <Plus className="w-5 h-5" />
-                    מתכון חדש ל{todayHebrew}
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+                    <input type="file" ref={menuInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleBulkMenuScan} />
+                    <button
+                        onClick={() => menuInputRef.current?.click()}
+                        disabled={isScanningMenu}
+                        className="bg-purple-500/10 text-purple-400 border border-purple-500/30 py-2.5 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-all disabled:opacity-50"
+                    >
+                        {isScanningMenu ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                        {isScanningMenu ? 'סורק...' : 'סרוק תפריט'}
+                    </button>
+                    <button
+                        onClick={() => setIsBuilding(true)}
+                        className="bg-[var(--color-primary)] text-slate-900 py-2.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:brightness-110 transition-all"
+                    >
+                        <Plus className="w-5 h-5" />
+                        מתכון חדש ל{todayHebrew}
+                    </button>
+                </div>
             </section>
 
             {/* KPI / Info Bar */}

@@ -747,7 +747,7 @@ function Dashboard() {
           ) : currentView === 'cookbook' ? (
             <Cookbook />
           ) : (
-            <UsersManagement />
+            <UsersManagement onNotify={setNotification} />
           )}
         </main>
 
@@ -952,13 +952,14 @@ function ReportPreviewModal({
   );
 }
 
-function UsersManagement() {
+function UsersManagement({ onNotify }: { onNotify: (n: { type: 'success' | 'error', message: string }) => void }) {
   const { role, businessId } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [localAccountantEmail, setLocalAccountantEmail] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);
   const [emailSaved, setEmailSaved] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   if (role !== 'admin' && role !== 'manager') {
     return (
@@ -1009,19 +1010,24 @@ function UsersManagement() {
   };
 
   const deleteUser = async (userId: string) => {
-    if (window.confirm('האם אתה בטוח שברצונך למחוק משתמש זה?')) {
-      try {
-        await deleteDoc(doc(db, 'users', userId));
-      } catch (error) {
-        console.error("Error deleting user:", error);
-      }
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      setDeleteConfirmId(null);
+      onNotify({ type: 'success', message: 'המשתמש נמחק בהצלחה.' });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      onNotify({ type: 'error', message: 'שגיאה במחיקת המשתמש.' });
     }
   };
 
   const copyInviteLink = () => {
-    const inviteLink = `${window.location.origin}?invite=${businessId}`;
-    navigator.clipboard.writeText(inviteLink);
-    alert('קישור ההזמנה הועתק ללוח!');
+    try {
+      const inviteLink = `${window.location.origin}?invite=${businessId}`;
+      navigator.clipboard.writeText(inviteLink);
+      onNotify({ type: 'success', message: 'קישור ההזמנה הועתק ללוח!' });
+    } catch {
+      onNotify({ type: 'error', message: 'העתקה נכשלה, נסה ידנית.' });
+    }
   };
 
   const saveAccountantEmail = async () => {
@@ -1127,13 +1133,30 @@ function UsersManagement() {
                         <option value="manager">Manager</option>
                         <option value="accountant">Accountant</option>
                       </select>
-                      <button
-                        onClick={() => deleteUser(u.id)}
-                        className="text-red-400 hover:text-red-300 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
-                        title="מחק משתמש"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {deleteConfirmId === u.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => deleteUser(u.id)}
+                            className="bg-red-500/20 text-red-400 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-500/30 transition-colors"
+                          >
+                            מחק
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="bg-white/5 text-gray-400 px-2 py-1 rounded text-[10px] hover:bg-white/10 transition-colors"
+                          >
+                            בטל
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirmId(u.id)}
+                          className="text-red-400 hover:text-red-300 p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
+                          title="מחק משתמש"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
