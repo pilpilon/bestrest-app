@@ -1,27 +1,32 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import nodemailer from 'nodemailer';
 
-// Note: These will be configured in Vercel environment variables
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const ACCOUNTANT_EMAIL = process.env.ACCOUNTANT_EMAIL;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-    const { expenses, userEmail, userName } = req.body;
+  const { expenses, userEmail, userName, accountantEmail, businessName } = req.body;
 
-    if (!expenses || !Array.isArray(expenses)) {
-        return res.status(400).json({ error: 'Missing expenses data' });
-    }
+  if (!expenses || !Array.isArray(expenses)) {
+    return res.status(400).json({ error: 'Missing expenses data' });
+  }
 
-    // Generate HTML Report
-    const totalAmount = expenses.reduce((sum, exp) => sum + (exp.total || 0), 0);
-    const rows = expenses.map(exp => `
+  // accountantEmail is the ONLY source of truth — set in Firestore by the business owner
+  if (!accountantEmail) {
+    return res.status(400).json({
+      error: 'לא הוגדר אימייל רואה חשבון. יש לעדכן אותו בהגדרות.'
+    });
+  }
+
+  // Generate HTML Report
+  const totalAmount = expenses.reduce((sum: number, exp: any) => sum + (exp.total || 0), 0);
+  const rows = expenses.map((exp: any) => `
     <tr>
       <td style="padding: 8px; border-bottom: 1px solid #eee;">${exp.date}</td>
       <td style="padding: 8px; border-bottom: 1px solid #eee;">${exp.supplier}</td>
@@ -30,9 +35,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     </tr>
   `).join('');
 
-    const htmlContent = `
+  const htmlContent = `
     <div dir="rtl" style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #0df280;">דו״ח הוצאות חודשי - מסעדת פרו</h2>
+      <h2 style="color: #0df280;">דו״ח הוצאות חודשי — ${businessName || 'מסעדה'}</h2>
       <p>שלום,</p>
       <p>מצורף ריכוז הוצאות עבור חודש ${new Date().toLocaleString('he-IL', { month: 'long', year: 'numeric' })}.</p>
       <p>שולח: <strong>${userName}</strong> (${userEmail})</p>
@@ -57,42 +62,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         </tfoot>
       </table>
       
-      <p style="margin-top: 30px; font-size: 0.8em; color: #666;">הופק באמצעות Antigravity Expense Manager</p>
+      <p style="margin-top: 30px; font-size: 0.8em; color: #666;">הופק באמצעות BestRest Expense Manager</p>
     </div>
   `;
 
-    try {
-        // If no SMTP configured, return success but log warning (for development)
-        if (!SMTP_USER || !SMTP_PASS) {
-            console.warn('SMTP not configured. Report generated but not sent.');
-            return res.status(200).json({
-                success: true,
-                message: 'Report generated successfully (Simulated - SMTP not configured)',
-                preview: htmlContent
-            });
-        }
-
-        const transporter = nodemailer.createTransport({
-            host: SMTP_HOST,
-            port: SMTP_PORT,
-            secure: SMTP_PORT === 465,
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS,
-            },
-        });
-
-        await transporter.sendMail({
-            from: `"Antigravity POS" <${SMTP_USER}>`,
-            to: ACCOUNTANT_EMAIL,
-            cc: userEmail,
-            subject: `דו״ח הוצאות - מסעדת פרו - ${new Date().toLocaleDateString('he-IL')}`,
-            html: htmlContent,
-        });
-
-        return res.status(200).json({ success: true, message: 'Report sent successfully' });
-    } catch (error) {
-        console.error('Email Error:', error);
-        return res.status(500).json({ error: 'Failed to send email: ' + (error as Error).message });
+  try {
+    if (!SMTP_USER || !SMTP_PASS) {
+      console.warn('SMTP not configured. Report generated but not sent.');
+      return res.status(200).json({
+        success: true,
+        message: 'Report generated successfully (Simulated - SMTP not configured)',
+        preview: htmlContent
+      });
     }
+
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+
+    await transporter.sendMail({
+      from: `"BestRest POS" <${SMTP_USER}>`,
+      to: accountantEmail,
+      cc: userEmail,
+      subject: `דו״ח הוצאות — ${businessName || 'מסעדה'} — ${new Date().toLocaleDateString('he-IL')}`,
+      html: htmlContent,
+    });
+
+    return res.status(200).json({ success: true, message: 'Report sent successfully' });
+  } catch (error) {
+    console.error('Email Error:', error);
+    return res.status(500).json({ error: 'Failed to send email: ' + (error as Error).message });
+  }
 }

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2 } from 'lucide-react';
 import { utils, writeFile } from 'xlsx';
 import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
@@ -9,7 +9,7 @@ import { useRef, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 // Firebase Storage import removed — uploads now go directly to OCR API as base64
-import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 function Dashboard() {
@@ -27,6 +27,7 @@ function Dashboard() {
   const defaultCategories = ["חומרי גלם", "שתייה", "אלכוהול", "ציוד", "תחזוקה", "שכירות", "עובדים", "חשמל / מים / גז", "כללי"];
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const allCategories = Array.from(new Set([...defaultCategories, ...customCategories]));
+  const [accountantEmail, setAccountantEmail] = useState<string>('');
 
   // View State
   const [currentView, setCurrentView] = useState<'dashboard' | 'cookbook' | 'users'>('dashboard');
@@ -59,13 +60,14 @@ function Dashboard() {
     return () => unsubscribe();
   }, [user, businessId]);
 
-  // Load Custom Categories
+  // Load Business Settings (custom categories + accountant email)
   useEffect(() => {
     if (!businessId) return;
     const unsub = onSnapshot(doc(db, 'businesses', businessId), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setCustomCategories(data.customCategories || []);
+        setAccountantEmail(data.accountantEmail || '');
       }
     });
     return () => unsub();
@@ -162,6 +164,17 @@ function Dashboard() {
     }
   };
 
+  const deleteExpense = async (expenseId: string) => {
+    if (!window.confirm('למחוק את החשבונית? פעולה זו אינה ניתנת לביטול.')) return;
+    try {
+      await deleteDoc(doc(db, 'expenses', expenseId));
+      setNotification({ type: 'success', message: 'החשבונית נמחקה בהצלחה.' });
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      setNotification({ type: 'error', message: 'שגיאה במחיקת החשבונית.' });
+    }
+  };
+
   const addCustomCategory = async (newCategory: string) => {
     if (!businessId) return;
     try {
@@ -210,9 +223,12 @@ function Dashboard() {
   };
 
   const sendReportToAccountant = async () => {
-    // ... rest of the function ...
     if (filteredExpenses.length === 0) {
       setNotification({ type: 'error', message: 'אין נתונים לשליחה' });
+      return;
+    }
+    if (!accountantEmail) {
+      setNotification({ type: 'error', message: 'לא הוגדר אימייל רואה חשבון. עדכן בהגדרות.' });
       return;
     }
     setIsSendingReport(true);
@@ -223,10 +239,11 @@ function Dashboard() {
         body: JSON.stringify({
           expenses: filteredExpenses,
           userEmail: user?.email,
-          userName: user?.displayName
+          userName: user?.displayName,
+          accountantEmail,
+          businessName,
         }),
       });
-      // ... rest of the catch/finally ...
       const result = await response.json();
       if (result.success) {
         setNotification({ type: 'success', message: 'הדו״ח נשלח בהצלחה לרואה החשבון!' });
@@ -476,6 +493,7 @@ function Dashboard() {
                           <th className="p-4 font-semibold whitespace-nowrap">ספק</th>
                           <th className="p-4 font-semibold whitespace-nowrap">קטגוריה</th>
                           <th className="p-4 font-semibold whitespace-nowrap">סכום</th>
+                          <th className="p-4 w-10"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
@@ -504,6 +522,17 @@ function Dashboard() {
                                 <span className="px-2 py-1 rounded bg-[var(--color-surface)] text-[10px] text-gray-300">{expense.category}</span>
                               </td>
                               <td className="p-4 font-bold text-[var(--color-primary)] whitespace-nowrap">₪{expense.total?.toLocaleString()}</td>
+                              <td className="p-4 whitespace-nowrap">
+                                {(role === 'admin' || role === 'manager') && (
+                                  <button
+                                    onClick={() => deleteExpense(expense.id)}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-red-500/10 text-red-400 hover:text-red-300"
+                                    title="מחק חשבונית"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </td>
                             </tr>
                           ))
                         )}
@@ -581,6 +610,9 @@ function UsersManagement() {
   const { role, businessId } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [localAccountantEmail, setLocalAccountantEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [emailSaved, setEmailSaved] = useState(false);
 
   if (role !== 'admin' && role !== 'manager') {
     return (
@@ -610,6 +642,17 @@ function UsersManagement() {
     return () => unsubscribe();
   }, [businessId]);
 
+  // Load current accountant email from businesses doc
+  useEffect(() => {
+    if (!businessId) return;
+    const unsub = onSnapshot(doc(db, 'businesses', businessId), (snapshot) => {
+      if (snapshot.exists()) {
+        setLocalAccountantEmail(snapshot.data().accountantEmail || '');
+      }
+    });
+    return () => unsub();
+  }, [businessId]);
+
   const updateUserRole = async (userId: string, newRole: string) => {
     try {
       const userRef = doc(db, 'users', userId);
@@ -619,8 +662,52 @@ function UsersManagement() {
     }
   };
 
+  const saveAccountantEmail = async () => {
+    if (!businessId) return;
+    setSavingEmail(true);
+    try {
+      await setDoc(doc(db, 'businesses', businessId), { accountantEmail: localAccountantEmail.trim() }, { merge: true });
+      setEmailSaved(true);
+      setTimeout(() => setEmailSaved(false), 3000);
+    } catch (error) {
+      console.error("Error saving accountant email:", error);
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
   return (
     <section className="space-y-6">
+
+      {/* Business Settings Card */}
+      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+        <h3 className="text-base font-bold flex items-center gap-2">
+          <Settings className="w-5 h-5 text-[var(--color-primary)]" />
+          הגדרות עסק
+        </h3>
+        <div className="space-y-2">
+          <label className="text-xs text-[var(--color-text-muted)] font-medium">אימייל רואה חשבון</label>
+          <p className="text-[11px] text-gray-500">לשליחת דו"חות הוצאות חודשיים</p>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              value={localAccountantEmail}
+              onChange={(e) => setLocalAccountantEmail(e.target.value)}
+              placeholder="accountant@example.com"
+              dir="ltr"
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:border-[var(--color-primary)] outline-none transition-colors"
+            />
+            <button
+              onClick={saveAccountantEmail}
+              disabled={savingEmail}
+              className="bg-[var(--color-primary)] text-slate-900 px-4 py-2.5 rounded-lg text-sm font-bold hover:brightness-110 disabled:opacity-50 transition-all whitespace-nowrap"
+            >
+              {emailSaved ? '✓ נשמר' : savingEmail ? '...' : 'שמור'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between px-1">
         <h3 className="text-xl font-bold flex items-center gap-2">
           <Users className="w-6 h-6 text-[var(--color-primary)]" />
@@ -687,6 +774,7 @@ function UsersManagement() {
     </section>
   );
 }
+
 
 function ReviewModal({
   data,
