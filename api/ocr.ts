@@ -89,6 +89,39 @@ const UNIT_NORMALIZE: Record<string, string> = {
 };
 
 /**
+ * Post-processing: detect and fix cases where Vision swapped qty and pricePerUnit.
+ *
+ * Problem: qty*price = total = price*qty (commutative), so Vision can't always tell which
+ * column is qty and which is price. Example:
+ *   Real:    qty=150, price=2.50, total=375
+ *   Vision:  qty=2.5, price=150, total=375   <- swapped
+ *
+ * Heuristic: if qty is a small fractional number (<10, non-integer) AND
+ * pricePerUnit is a large round integer (>=10, integer), they are likely swapped.
+ */
+function fixSwappedQtyPrice(items: any[]): any[] {
+    return items.map(item => {
+        const qty = Number(item.quantity);
+        const price = Number(item.pricePerUnit);
+        const total = Number(item.totalPrice);
+
+        // Only attempt swap when math holds either way
+        if (total <= 0 || Math.abs(qty * price - total) / total > 0.02) return item;
+
+        // Swap heuristic: qty looks like a price (small decimal) and price looks like a qty (large integer)
+        const qtyLooksLikePrice = !Number.isInteger(qty) && qty < 10;
+        const priceLooksLikeQty = Number.isInteger(price) && price >= 10;
+
+        if (qtyLooksLikePrice && priceLooksLikeQty) {
+            console.log(`  SwapFix "${item.name}": qty ${qty}<->${price}, price ${price}<->${qty}`);
+            return { ...item, quantity: price, pricePerUnit: qty };
+        }
+
+        return item;
+    });
+}
+
+/**
  * Extract line items directly from the invoice IMAGE using Gemini 2.5 Flash Vision.
  * This is much more accurate than text-based parsing because the model can see
  * the actual table structure and read Hebrew RTL columns correctly.
@@ -319,6 +352,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
             console.log("Extracting line items via Gemini Vision (image-based)...");
             parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg', rawText);
+            // Fix swapped qty/price where math is ambiguous (e.g. 2.5x150=375 and 150x2.5=375)
+            parsed.lineItems = fixSwappedQtyPrice(parsed.lineItems);
             console.log(`Vision extracted ${parsed.lineItems.length} line items from image`);
         } catch (itemsErr) {
             console.error("Line items extraction failed:", itemsErr);
