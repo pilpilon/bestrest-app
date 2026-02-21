@@ -16,39 +16,12 @@ export function Login() {
             {/* Main Content Container */}
             <main className="relative z-10 w-full max-w-md px-6 py-12 flex flex-col items-center" dir="rtl">
 
-                {/* Header Branding */}
-                <div className="w-full flex justify-between items-center mb-12 px-2">
-                    <button className="text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 p-2 rounded-full transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[var(--color-primary)] font-bold tracking-wider text-sm">PRO SYSTEM</span>
-                        <div className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></div>
-                    </div>
-                    <button className="text-[var(--color-text-muted)] hover:text-white p-2 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                    </button>
-                </div>
 
                 {/* Central Login Card */}
                 <div className="bg-[rgba(16,34,25,0.6)] backdrop-blur-xl border-t border-[var(--color-primary)]/30 shadow-[0_0_15px_rgba(13,242,128,0.3)] w-full p-8 rounded-xl flex flex-col items-center text-center">
 
-                    {/* Styled Receipt Icon */}
-                    <div className="relative mb-6">
-                        <div className="absolute inset-0 bg-[var(--color-primary)]/20 blur-xl rounded-full"></div>
-                        <div className="relative flex items-center justify-center w-20 h-20 rounded-full border-2 border-[var(--color-primary)]/50 bg-[var(--color-background)]/50">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-[var(--color-primary)] drop-shadow-[0_0_10px_rgba(13,242,128,0.5)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                        </div>
-                    </div>
-
                     {/* Title & Subtext */}
-                    <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">BestRest בסטרסט</h1>
+                    <h1 className="text-5xl font-bold text-white mb-2 tracking-tight">בסטרסט</h1>
                     <p className="text-[var(--color-primary)] font-medium mb-10 opacity-90">ניהול הוצאות חכם למסעדות</p>
 
                     {/* Hero Image */}
@@ -74,12 +47,6 @@ export function Login() {
                                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
                             </svg>
                             <span>התחבר באמצעות Google</span>
-                        </button>
-                        <button className="w-full flex items-center justify-center gap-2 px-6 py-4 border border-white/10 hover:border-[var(--color-primary)]/50 text-white/80 font-medium rounded-lg transition-all duration-300 bg-white/5">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
-                            <span>כניסה עם אימייל ארגוני</span>
                         </button>
                     </div>
 
