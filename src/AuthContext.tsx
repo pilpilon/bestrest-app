@@ -9,10 +9,13 @@ interface AuthContextType {
     role: 'admin' | 'manager' | 'accountant' | null;
     businessId: string | null;
     businessName: string | null;
+    subscriptionTier: 'free' | 'pro';
+    ocrScansThisMonth: number;
     completedOnboarding: boolean;
     loading: boolean;
     signInWithGoogle: () => Promise<void>;
     logout: () => Promise<void>;
+    incrementOcrScan: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -22,6 +25,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [role, setRole] = useState<'admin' | 'manager' | 'accountant' | null>(null);
     const [businessId, setBusinessId] = useState<string | null>(null);
     const [businessName, setBusinessName] = useState<string | null>(null);
+    const [subscriptionTier, setSubscriptionTier] = useState<'free' | 'pro'>('free');
+    const [ocrScansThisMonth, setOcrScansThisMonth] = useState<number>(0);
     const [completedOnboarding, setCompletedOnboarding] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -44,13 +49,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     console.log("Setting up snapshot for user:", currentUser.uid);
                     const userDocRef = doc(db, 'users', currentUser.uid);
 
-                    unsubscribeProfile = onSnapshot(userDocRef, (snapshot) => {
+                    unsubscribeProfile = onSnapshot(userDocRef, async (snapshot) => {
                         if (snapshot.exists()) {
                             const data = snapshot.data();
                             console.log("Profile data updated:", data);
                             setRole(data.role || 'manager');
                             setBusinessId(data.businessId || 'main_branch');
                             setBusinessName(data.businessName || null);
+
+                            // Initialize new fields with fallbacks
+                            const tier = data.subscriptionTier || 'free';
+                            setSubscriptionTier(tier);
+
+                            // Check if a new month started and we need to reset the counter
+                            const now = new Date();
+                            const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`;
+
+                            if (data.ocrScanResetDate !== currentMonth && tier === 'free') {
+                                // Reset scan count for the new month
+                                await setDoc(userDocRef, {
+                                    ocrScansThisMonth: 0,
+                                    ocrScanResetDate: currentMonth
+                                }, { merge: true });
+                                setOcrScansThisMonth(0);
+                            } else {
+                                setOcrScansThisMonth(data.ocrScansThisMonth || 0);
+                            }
+
                             setCompletedOnboarding(data.completedOnboarding ?? !!data.businessName);
                             setLoading(false);
                         } else {
@@ -77,8 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                             setRole(newRole);
                             setBusinessId(newBusinessId);
+                            setSubscriptionTier('free');
+                            setOcrScansThisMonth(0);
                             setCompletedOnboarding(false);
                             setLoading(false);
+
+                            const now = new Date();
+                            const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`;
 
                             // Create initial profile document
                             setDoc(userDocRef, {
@@ -88,8 +118,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 photoURL: currentUser.photoURL,
                                 role: newRole,
                                 businessId: newBusinessId,
+                                subscriptionTier: 'free',
+                                ocrScansThisMonth: 0,
+                                ocrScanResetDate: currentMonth,
                                 completedOnboarding: false,
-                                createdAt: new Date().toISOString()
+                                createdAt: now.toISOString()
                             }, { merge: true }).catch(e => console.error("Failed to persist initial user profile:", e));
                         }
                     }, (error) => {
@@ -101,6 +134,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setRole(null);
                     setBusinessId(null);
                     setBusinessName(null);
+                    setSubscriptionTier('free');
+                    setOcrScansThisMonth(0);
                     setCompletedOnboarding(false);
                     setLoading(false);
                 }
@@ -133,15 +168,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const incrementOcrScan = async () => {
+        if (!user) return false;
+        try {
+            if (subscriptionTier === 'free' && ocrScansThisMonth >= 5) {
+                return false; // Deny if at limit
+            }
+            const userDocRef = doc(db, 'users', user.uid);
+            await setDoc(userDocRef, {
+                ocrScansThisMonth: ocrScansThisMonth + 1
+            }, { merge: true });
+            return true;
+        } catch (err) {
+            console.error('Error incrementing scan count:', err);
+            return false;
+        }
+    };
+
     const value = {
         user,
         role,
         businessId,
         businessName,
+        subscriptionTier,
+        ocrScansThisMonth,
         completedOnboarding,
         loading,
         signInWithGoogle,
-        logout
+        logout,
+        incrementOcrScan
     };
 
     return (

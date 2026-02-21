@@ -1,9 +1,12 @@
-import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2, CreditCard, Lock } from 'lucide-react';
 import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Login } from './Login';
 import { Onboarding } from './Onboarding';
 import { Cookbook } from './Cookbook';
+import { Subscription } from './Subscription';
+import { UpgradeModal } from './UpgradeModal';
+import { LandingPage } from './LandingPage';
 import { useRef, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -12,7 +15,7 @@ import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot,
 import { db } from './firebase';
 
 function Dashboard() {
-  const { user, role, businessId, businessName, logout } = useAuth();
+  const { user, role, businessId, businessName, logout, subscriptionTier, ocrScansThisMonth, incrementOcrScan } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
@@ -31,10 +34,14 @@ function Dashboard() {
   const [accountantEmail, setAccountantEmail] = useState<string>('');
 
   // View State
-  const [currentView, setCurrentView] = useState<'dashboard' | 'cookbook' | 'users'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'cookbook' | 'users' | 'subscription'>('dashboard');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportPreview, setShowReportPreview] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  // Paywall State
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState('');
 
   // New Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,6 +85,14 @@ function Dashboard() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
+
+    // First check Paywall Gate for OCR Scan
+    if (subscriptionTier === 'free' && (ocrScansThisMonth || 0) >= 5) {
+      setUpgradeFeature('סריקת חשבונית וקריאת נתונים עם AI');
+      setShowUpgradeModal(true);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     // Show 0% progress while encoding
     setUploadProgress(0);
@@ -125,6 +140,9 @@ function Dashboard() {
 
         // Result from /api/ocr (main pipe with pure-code triplet parser)
         const lineItems = result.data.lineItems || [];
+
+        // Increment scan count in Firestore
+        await incrementOcrScan();
 
         setOcrResult({
           ...result.data,
@@ -244,6 +262,12 @@ function Dashboard() {
   }, [notification]);
 
   const handleExport = () => {
+    if (subscriptionTier === 'free') {
+      setUpgradeFeature('ייצוא נתונים מלא לרואה חשבון');
+      setShowUpgradeModal(true);
+      return;
+    }
+
     if (filteredExpenses.length === 0) {
       setNotification({ type: 'error', message: 'אין נתונים לייצוא' });
       return;
@@ -531,35 +555,51 @@ function Dashboard() {
                 </div>
 
                 {/* Card 4: Price Rise Detector */}
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative overflow-hidden">
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">מגמת מחירים ⚡</p>
-                  {priceRiseAlerts.length > 0 ? (
-                    <div className="space-y-1.5 mt-1">
-                      {priceRiseAlerts.slice(0, 2).map(alert => (
-                        <div key={alert.supplier} className="flex items-center justify-between">
-                          <span className="text-[10px] text-white truncate max-w-[100px]">{alert.supplier}</span>
-                          <span className="text-[10px] font-bold text-red-400 flex-shrink-0">+{alert.pct}%</span>
-                        </div>
-                      ))}
-                      {priceRiseAlerts.length > 2 && (
-                        <p className="text-[9px] text-[var(--color-text-muted)]">+{priceRiseAlerts.length - 2} ספקים נוספים</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <div className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></div>
-                      <p className="text-xs text-[var(--color-primary)] font-bold">מחירים יציבים</p>
-                    </div>
-                  )}
-                  {priceRiseAlerts.length > 0 && (
-                    <button
-                      onClick={sendReportToAccountant}
-                      disabled={isSendingReport}
-                      className="mt-2 w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-1 rounded-lg text-[9px] font-bold transition-all"
+
+                  {subscriptionTier === 'free' && (
+                    <div
+                      className="absolute inset-0 z-10 backdrop-blur-md bg-black/40 flex flex-col items-center justify-center cursor-pointer transition-colors hover:bg-black/50"
+                      onClick={() => {
+                        setUpgradeFeature('בוט התראות על התייקרות מחירים');
+                        setShowUpgradeModal(true);
+                      }}
                     >
-                      שלח התראה לרו״ח
-                    </button>
+                      <Lock className="w-5 h-5 text-white/70 mb-1" />
+                      <span className="text-[10px] font-bold text-white/90">זמין בפרו</span>
+                    </div>
                   )}
+
+                  <div className={subscriptionTier === 'free' ? 'opacity-30 pointer-events-none' : ''}>
+                    {priceRiseAlerts.length > 0 ? (
+                      <div className="space-y-1.5 mt-1">
+                        {priceRiseAlerts.slice(0, 2).map(alert => (
+                          <div key={alert.supplier} className="flex items-center justify-between">
+                            <span className="text-[10px] text-white truncate max-w-[100px]">{alert.supplier}</span>
+                            <span className="text-[10px] font-bold text-red-400 flex-shrink-0">+{alert.pct}%</span>
+                          </div>
+                        ))}
+                        {priceRiseAlerts.length > 2 && (
+                          <p className="text-[9px] text-[var(--color-text-muted)]">+{priceRiseAlerts.length - 2} ספקים נוספים</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <div className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></div>
+                        <p className="text-xs text-[var(--color-primary)] font-bold">מחירים יציבים</p>
+                      </div>
+                    )}
+                    {priceRiseAlerts.length > 0 && (
+                      <button
+                        onClick={sendReportToAccountant}
+                        disabled={isSendingReport}
+                        className="mt-2 w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-1 rounded-lg text-[9px] font-bold transition-all relative z-0"
+                      >
+                        שלח התראה לרו״ח
+                      </button>
+                    )}
+                  </div>
                 </div>
               </section>
 
@@ -746,8 +786,16 @@ function Dashboard() {
             </>
           ) : currentView === 'cookbook' ? (
             <Cookbook />
+          ) : currentView === 'subscription' ? (
+            <Subscription />
           ) : (
-            <UsersManagement onNotify={setNotification} />
+            <UsersManagement
+              onNotify={setNotification}
+              onRequireUpgrade={(feature) => {
+                setUpgradeFeature(feature);
+                setShowUpgradeModal(true);
+              }}
+            />
           )}
         </main>
 
@@ -780,11 +828,20 @@ function Dashboard() {
 
             <button
               onClick={() => setCurrentView('users')}
-              className={`flex flex-col items-center gap-1 transition-colors ml-12 ${currentView === 'users' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+              className={`flex flex-col items-center gap-1 transition-colors ml-4 ${currentView === 'users' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
             >
               <Settings className="w-6 h-6" />
-              <span className="text-[10px] font-medium">{role === 'admin' ? 'משתמשים' : 'הגדרות'}</span>
+              <span className="text-[10px] font-medium">{role === 'admin' ? 'הגדרות' : 'משתמשים'}</span>
             </button>
+
+            <button
+              onClick={() => setCurrentView('subscription')}
+              className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'subscription' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+            >
+              <CreditCard className="w-6 h-6" />
+              <span className="text-[10px] font-medium">מנוי</span>
+            </button>
+
             <button onClick={logout} className="flex flex-col items-center gap-1 text-[var(--color-text-muted)]">
               <LogOut className="w-6 h-6" />
               <span className="text-[10px] font-medium">התנתק</span>
@@ -952,8 +1009,8 @@ function ReportPreviewModal({
   );
 }
 
-function UsersManagement({ onNotify }: { onNotify: (n: { type: 'success' | 'error', message: string }) => void }) {
-  const { role, businessId } = useAuth();
+function UsersManagement({ onNotify, onRequireUpgrade }: { onNotify: (n: { type: 'success' | 'error', message: string }) => void, onRequireUpgrade: (feature: string) => void }) {
+  const { role, businessId, subscriptionTier } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [localAccountantEmail, setLocalAccountantEmail] = useState('');
@@ -1081,13 +1138,26 @@ function UsersManagement({ onNotify }: { onNotify: (n: { type: 'success' | 'erro
           <Users className="w-6 h-6 text-[var(--color-primary)]" />
           ניהול משתמשים והרשאות
         </h3>
-        <button
-          onClick={copyInviteLink}
-          className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          העתק קישור הזמנה
-        </button>
+
+        <div className="relative">
+          {subscriptionTier === 'free' && (
+            <div
+              className="absolute inset-0 z-10 backdrop-blur-[2px] bg-black/20 rounded-lg flex items-center justify-center cursor-pointer hover:bg-black/40 transition-colors"
+              onClick={() => onRequireUpgrade('הוספת משתמשים וניהול צוות')}
+            >
+              <Lock className="w-4 h-4 text-white/80 ml-1" />
+              <span className="text-xs font-bold text-white shadow-black drop-shadow-md">זמין בפרו</span>
+            </div>
+          )}
+          <button
+            onClick={copyInviteLink}
+            disabled={subscriptionTier === 'free'}
+            className={`bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${subscriptionTier === 'free' ? 'opacity-50' : ''}`}
+          >
+            <Plus className="w-4 h-4" />
+            העתק קישור הזמנה
+          </button>
+        </div>
       </div>
 
       <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
@@ -1449,6 +1519,7 @@ export function ReviewModal({
 
 function MainApp() {
   const { user, completedOnboarding, loading } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
   console.log("MainApp Render:", { user: !!user, completedOnboarding, loading });
 
   if (loading) {
@@ -1459,6 +1530,7 @@ function MainApp() {
     );
   }
 
+  if (!user && !showLogin) return <LandingPage onLogin={() => setShowLogin(true)} />;
   if (!user) return <Login />;
   if (!completedOnboarding) return <Onboarding />;
 

@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Search, ChevronLeft, ChefHat, Info, Trash2, Target, TrendingUp, Camera, Loader2 } from 'lucide-react';
+import { Plus, Search, ChevronLeft, ChefHat, Info, Trash2, Target, TrendingUp, Camera, Loader2, Lock } from 'lucide-react';
 import { RecipeBuilder } from './RecipeBuilder';
 import type { Recipe } from './RecipeBuilder';
 import { useAuth } from './AuthContext';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { UpgradeModal } from './UpgradeModal';
 
 export function Cookbook() {
-    const { businessId } = useAuth();
+    const { businessId, subscriptionTier } = useAuth();
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState(true);
     const [isBuilding, setIsBuilding] = useState(false);
     const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
     const menuInputRef = useRef<HTMLInputElement>(null);
     const [isScanningMenu, setIsScanningMenu] = useState(false);
@@ -146,14 +148,26 @@ export function Cookbook() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 shrink-0">
                     <input type="file" ref={menuInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleBulkMenuScan} />
-                    <button
-                        onClick={() => menuInputRef.current?.click()}
-                        disabled={isScanningMenu}
-                        className="bg-purple-500/10 text-purple-400 border border-purple-500/30 py-2.5 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-all disabled:opacity-50"
-                    >
-                        {isScanningMenu ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
-                        {isScanningMenu ? 'סורק...' : 'סרוק תפריט'}
-                    </button>
+
+                    <div className="relative">
+                        {subscriptionTier === 'free' && (
+                            <div
+                                className="absolute inset-0 z-10 backdrop-blur-[2px] bg-black/20 rounded-xl flex items-center justify-center cursor-pointer hover:bg-black/40 transition-colors"
+                                onClick={() => setShowUpgradeModal(true)}
+                            >
+                                <Lock className="w-4 h-4 text-white/80 mr-1" />
+                            </div>
+                        )}
+                        <button
+                            onClick={() => menuInputRef.current?.click()}
+                            disabled={isScanningMenu || subscriptionTier === 'free'}
+                            className={`bg-purple-500/10 text-purple-400 border border-purple-500/30 py-2.5 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-all ${(isScanningMenu || subscriptionTier === 'free') ? 'opacity-50' : ''}`}
+                        >
+                            {isScanningMenu ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                            {isScanningMenu ? 'סורק...' : 'סרוק תפריט'}
+                        </button>
+                    </div>
+
                     <button
                         onClick={() => setIsBuilding(true)}
                         className="bg-[var(--color-primary)] text-slate-900 py-2.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:brightness-110 transition-all"
@@ -293,6 +307,12 @@ export function Cookbook() {
                     </button>
                 )}
             </div>
+
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                featureName="סריקת תפריט אוטומטית (AI)"
+            />
         </div>
     );
 }
