@@ -33,6 +33,7 @@ function Dashboard() {
   // View State
   const [currentView, setCurrentView] = useState<'dashboard' | 'cookbook' | 'users'>('dashboard');
   const [isSendingReport, setIsSendingReport] = useState(false);
+  const [showReportPreview, setShowReportPreview] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   // New Filter States
@@ -257,6 +258,13 @@ function Dashboard() {
       setNotification({ type: 'error', message: 'לא הוגדר אימייל רואה חשבון. עדכן בהגדרות.' });
       return;
     }
+    // Show the approval preview modal first
+    setShowReportPreview(true);
+  };
+
+  const confirmSendReport = async () => {
+    const unsentExpenses = filteredExpenses.filter(exp => !exp.isSent);
+    setShowReportPreview(false);
     setIsSendingReport(true);
     try {
       const response = await fetch('/api/send-report', {
@@ -662,6 +670,17 @@ function Dashboard() {
             onClose={() => setSelectedExpenseForPreview(null)}
           />
         )}
+
+        {/* Report Approval Modal */}
+        {showReportPreview && (
+          <ReportPreviewModal
+            expenses={filteredExpenses.filter(exp => !exp.isSent)}
+            accountantEmail={accountantEmail}
+            isSending={isSendingReport}
+            onConfirm={confirmSendReport}
+            onClose={() => setShowReportPreview(false)}
+          />
+        )}
       </div>
     </div>
   );
@@ -686,6 +705,106 @@ function ImagePreviewModal({ expense, onClose }: { expense: any, onClose: () => 
             alt="Invoice"
             className="max-w-full h-auto rounded-lg shadow-2xl border border-white/5"
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportPreviewModal({
+  expenses,
+  accountantEmail,
+  isSending,
+  onConfirm,
+  onClose,
+}: {
+  expenses: any[];
+  accountantEmail: string;
+  isSending: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const totalAmount = expenses.reduce((sum, exp) => sum + (exp.total || 0), 0);
+  const withImages = expenses.filter(exp => exp.imageUrl).length;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" dir="rtl">
+      <div className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+
+        {/* Header */}
+        <div className="p-5 border-b border-white/10 flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Receipt className="w-6 h-6 text-[var(--color-primary)]" />
+              אישור שליחה לרואה חשבון
+            </h2>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">
+              נשלח אל: <span className="text-white font-mono">{accountantEmail}</span>
+            </p>
+          </div>
+          <button onClick={onClose} disabled={isSending} className="text-gray-400 hover:text-white transition-colors p-1.5 bg-white/5 rounded-lg">
+            <Plus className="w-5 h-5 rotate-45" />
+          </button>
+        </div>
+
+        {/* Summary Stats */}
+        <div className="px-5 pt-4 grid grid-cols-3 gap-3">
+          <div className="bg-white/5 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-[var(--color-text-muted)] uppercase font-bold mb-1">חשבוניות</p>
+            <p className="text-2xl font-black text-white">{expenses.length}</p>
+          </div>
+          <div className="bg-white/5 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-[var(--color-text-muted)] uppercase font-bold mb-1">סה״כ</p>
+            <p className="text-lg font-black text-[var(--color-primary)]">₪{totalAmount.toLocaleString()}</p>
+          </div>
+          <div className="bg-white/5 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-[var(--color-text-muted)] uppercase font-bold mb-1">עם תמונות</p>
+            <p className="text-2xl font-black text-white">{withImages}</p>
+          </div>
+        </div>
+
+        {/* Expenses List */}
+        <div className="flex-1 overflow-auto p-5 pt-3 space-y-2">
+          {expenses.map((exp, i) => (
+            <div key={exp.id || i} className="flex items-center justify-between bg-white/5 rounded-xl p-3 gap-3">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {exp.imageUrl ? (
+                  <img src={exp.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-white/10 flex-shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                    <Receipt className="w-4 h-4 text-gray-500" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="font-bold text-sm text-white truncate">{exp.supplier}</p>
+                  <p className="text-[10px] text-[var(--color-text-muted)]">{exp.date} · {exp.category}</p>
+                </div>
+              </div>
+              <p className="font-bold text-[var(--color-primary)] text-sm flex-shrink-0">₪{exp.total?.toLocaleString()}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-5 pt-3 border-t border-white/10 flex gap-3">
+          <button
+            onClick={onConfirm}
+            disabled={isSending}
+            className="flex-1 bg-[var(--color-primary)] text-slate-900 font-bold py-3 rounded-xl hover:brightness-110 shadow-[0_0_20px_rgba(13,242,128,0.3)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isSending ? (
+              <><div className="w-4 h-4 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin" />שולח...</>
+            ) : (
+              <><Download className="w-4 h-4" />אשר ושלח</>
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={isSending}
+            className="px-6 py-3 border border-white/10 text-white font-medium rounded-xl hover:bg-white/5 transition-colors disabled:opacity-50"
+          >
+            ביטול
+          </button>
         </div>
       </div>
     </div>
