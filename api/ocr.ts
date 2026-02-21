@@ -83,50 +83,74 @@ ${rawText.substring(0, 3000)}
 }
 
 /**
- * Pure-code RTL column parser.
- * Israeli OCR text dumps invoice numbers in RTL order per row: total, pricePerUnit, quantity.
- * We extract standalone numeric lines, find triplets satisfying (qty × price ≈ total),
- * then overwrite whatever Gemini extracted with these verified values.
- * Immune to product-name-number confusion (e.g. "\u05e7\u05e8\u05d8\u05d5\u05e0\u05d9\u05dd 5", "30 \u05d9\u05d7'").
+ * Pure-code RTL column parser (v2 — robust best-match).
+ *
+ * Israeli OCR text dumps invoice numbers in RTL order per row:
+ *   סה"כ (total)  |  ש"ח ליחידה (price)  |  כמות (qty)
+ *
+ * Strategy:
+ *  1. Extract every standalone number from the raw text.
+ *  2. Slide a window of 3 and collect ALL valid triplets where b*c ≈ a (2% tolerance).
+ *  3. For each Gemini line item, find the triplet whose `total` is closest to the
+ *     Gemini-guessed totalPrice. If confident (<15% deviation), overwrite qty/price/total.
+ *
+ * Unlike v1, this does NOT abort when triplet count ≠ item count — it just matches
+ * as many items as possible, skipping items where no confident match exists.
  */
 function fixLineItemsFromRawText(items: any[], rawText: string): any[] {
     if (!items.length) return items;
 
-    // Extract standalone numeric lines (handles commas and leading $)
+    // 1. Extract all standalone numbers (strip $, commas)
     const nums: number[] = rawText
         .split('\n')
         .map(l => l.trim().replace(/[$,]/g, ''))
         .filter(l => /^\d+\.?\d*$/.test(l))
         .map(l => parseFloat(l));
 
-    // Find triplets [a, b, c] where c \u00d7 b \u2248 a (total, price, qty \u2014 RTL order)
-    const triplets: Array<{ total: number; price: number; qty: number }> = [];
-    let i = 0;
-    while (i < nums.length - 2 && triplets.length < items.length) {
-        const [a, b, c] = [nums[i], nums[i + 1], nums[i + 2]];
-        if (b > 0 && c > 0) {
-            const ratio = Math.abs(b * c - a) / (a || 1);
-            if (ratio < 0.02) {
-                triplets.push({ total: a, price: b, qty: c });
-                i += 3;
-                continue;
-            }
-        }
-        i++;
-    }
-
-    if (triplets.length !== items.length) {
-        console.log(`Column parser: ${triplets.length} triplets for ${items.length} items \u2014 skipping`);
+    if (nums.length < 3) {
+        console.log('Column parser: not enough numeric lines, skipping');
         return items;
     }
 
-    console.log(`Column parser: correcting ${items.length} items with raw-text column values`);
-    return items.map((item, idx) => ({
-        ...item,
-        quantity: triplets[idx].qty,
-        pricePerUnit: triplets[idx].price,
-        totalPrice: triplets[idx].total,
-    }));
+    // 2. Collect ALL valid triplets using a sliding window (no early stop)
+    const triplets: Array<{ total: number; price: number; qty: number }> = [];
+    for (let i = 0; i < nums.length - 2; i++) {
+        const [a, b, c] = [nums[i], nums[i + 1], nums[i + 2]];
+        if (a > 0 && b > 0 && c > 0) {
+            const ratio = Math.abs(b * c - a) / a;
+            if (ratio < 0.02) {
+                triplets.push({ total: a, price: b, qty: c });
+            }
+        }
+    }
+
+    console.log(`Column parser v2: found ${triplets.length} triplets for ${items.length} items`);
+    if (!triplets.length) return items;
+
+    // 3. Match each item to the closest unused triplet by totalPrice
+    const used = new Set<number>();
+    return items.map(item => {
+        const geminiTotal = Number(item.totalPrice) || 0;
+        if (geminiTotal <= 0) return item;
+
+        let bestIdx = -1;
+        let bestRatio = Infinity;
+        for (let t = 0; t < triplets.length; t++) {
+            if (used.has(t)) continue;
+            const ratio = Math.abs(triplets[t].total - geminiTotal) / geminiTotal;
+            if (ratio < bestRatio) { bestRatio = ratio; bestIdx = t; }
+        }
+
+        // Only accept if within 15% — tolerates minor OCR read differences
+        if (bestIdx >= 0 && bestRatio < 0.15) {
+            used.add(bestIdx);
+            const t = triplets[bestIdx];
+            console.log(`  Fix "${item.name}": qty ${item.quantity}→${t.qty}, price ${item.pricePerUnit}→${t.price}, total ${item.totalPrice}→${t.total}`);
+            return { ...item, quantity: t.qty, pricePerUnit: t.price, totalPrice: t.total };
+        }
+
+        return item;
+    });
 }
 
 // Helper: extract line items from the original invoice IMAGE using Vision
