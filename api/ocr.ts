@@ -3,10 +3,13 @@ import vision from '@google-cloud/vision';
 
 // Initialize the Vision client
 // In production, GOOGLE_APPLICATION_CREDENTIALS_JSON should be set in Vercel environment variables
+const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+if (!credentialsJson) {
+    console.warn('WARNING: GOOGLE_APPLICATION_CREDENTIALS_JSON is not set in environment variables.');
+}
+
 const client = new vision.ImageAnnotatorClient({
-    credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
-        ? JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON)
-        : undefined,
+    credentials: credentialsJson ? JSON.parse(credentialsJson) : undefined,
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -99,7 +102,7 @@ ${rawText}
             const totalMatch = rawText.match(/(?:סה["״]כ|Total|סכום)\s*[:]?\s*(\d+(?:\.\d{1,2})?)/i);
             parsedData.total = totalMatch ? parseFloat(totalMatch[1]) : 0;
 
-            const dateMatch = rawText.match(/(\d{1,2}[\/\.]d{1,2}[\/\.]\d{2,4})/);
+            const dateMatch = rawText.match(/(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})/);
             parsedData.date = dateMatch ? dateMatch[1] : new Date().toLocaleDateString('he-IL');
             parsedData.category = "בתהליך...";
         }
