@@ -299,6 +299,63 @@ function Dashboard() {
 
   const monthlyTotal = expenses.reduce((sum, exp) => sum + (exp.total || 0), 0);
   const invoiceCount = expenses.length;
+  const unsentCount = expenses.filter(exp => !exp.isSent).length;
+
+  // Month-over-month comparison
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const currentMonthTotal = expenses
+    .filter(exp => {
+      if (!exp.createdAt?.toDate) return false;
+      const d = exp.createdAt.toDate();
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    })
+    .reduce((sum, exp) => sum + (exp.total || 0), 0);
+  const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
+  const lastMonthTotal = expenses
+    .filter(exp => {
+      if (!exp.createdAt?.toDate) return false;
+      const d = exp.createdAt.toDate();
+      return d.getMonth() === lastMonthDate.getMonth() && d.getFullYear() === lastMonthDate.getFullYear();
+    })
+    .reduce((sum, exp) => sum + (exp.total || 0), 0);
+  const monthlyChange = lastMonthTotal > 0
+    ? (((currentMonthTotal - lastMonthTotal) / lastMonthTotal) * 100).toFixed(1)
+    : null;
+
+  // Top supplier by total spend
+  const supplierTotals = expenses.reduce((acc, exp) => {
+    if (exp.supplier) acc[exp.supplier] = (acc[exp.supplier] || 0) + (exp.total || 0);
+    return acc;
+  }, {} as Record<string, number>);
+  const topSupplier = (Object.entries(supplierTotals) as [string, number][]).sort((a, b) => b[1] - a[1])[0];
+  const topSupplierPct = topSupplier && monthlyTotal > 0
+    ? Math.round((topSupplier[1] / monthlyTotal) * 100)
+    : 0;
+
+  // Price Rise Detector: compare average per-supplier cost this month vs last month
+  const priceRiseAlerts = (Object.entries(supplierTotals) as [string, number][])
+    .map(([supplier]) => {
+      const thisMonth = expenses
+        .filter(exp => {
+          if (!exp.createdAt?.toDate) return false;
+          const d = exp.createdAt.toDate();
+          return exp.supplier === supplier && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        });
+      const lastMonth = expenses
+        .filter(exp => {
+          if (!exp.createdAt?.toDate) return false;
+          const d = exp.createdAt.toDate();
+          return exp.supplier === supplier && d.getMonth() === lastMonthDate.getMonth() && d.getFullYear() === lastMonthDate.getFullYear();
+        });
+      const avgThis = thisMonth.length > 0 ? thisMonth.reduce((s, e) => s + (e.total || 0), 0) / thisMonth.length : 0;
+      const avgLast = lastMonth.length > 0 ? lastMonth.reduce((s, e) => s + (e.total || 0), 0) / lastMonth.length : 0;
+      const pct = avgLast > 0 ? ((avgThis - avgLast) / avgLast) * 100 : 0;
+      return { supplier, pct: Math.round(pct), avgThis, avgLast };
+    })
+    .filter(a => a.pct >= 10 && a.avgThis > 0 && a.avgLast > 0)
+    .sort((a, b) => b.pct - a.pct);
 
   // Analytics Data Preparation
   const categoryData = Object.entries(
@@ -388,37 +445,81 @@ function Dashboard() {
             <>
               {/* KPI Cards Section */}
               <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Card 1: Monthly Total */}
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative overflow-hidden group">
                   <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-primary)]"></div>
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">הוצאות החודש</p>
                   <h3 className="text-2xl font-black">₪{monthlyTotal.toLocaleString()}</h3>
-                  <div className="mt-2 flex items-center gap-1 text-[var(--color-primary)] text-[10px] font-bold">
-                    <span className="bg-[var(--color-primary)]/10 px-1.5 py-0.5 rounded">+12.5%</span>
+                  <div className="mt-2 flex items-center gap-1 text-[10px] font-bold">
+                    {monthlyChange !== null ? (
+                      <span className={`px-1.5 py-0.5 rounded ${parseFloat(monthlyChange) > 0
+                        ? 'bg-red-500/10 text-red-400'
+                        : 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
+                        }`}>
+                        {parseFloat(monthlyChange) > 0 ? '+' : ''}{monthlyChange}% מחודש שעבר
+                      </span>
+                    ) : (
+                      <span className="text-[var(--color-text-muted)]">אין נתון השוואתי</span>
+                    )}
                   </div>
                 </div>
+
+                {/* Card 2: Invoice Count */}
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl">
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">חשבוניות שנסרקו</p>
                   <h3 className="text-2xl font-black">{invoiceCount}</h3>
-                  <p className="text-[10px] text-[var(--color-text-muted)] mt-2">סה״כ החודש</p>
+                  <p className="text-[10px] mt-2">
+                    {unsentCount > 0 ? (
+                      <span className="text-orange-400">{unsentCount} ממתינות לרו״ח</span>
+                    ) : (
+                      <span className="text-[var(--color-primary)]">הכל נשלח ✓</span>
+                    )}
+                  </p>
                 </div>
+
+                {/* Card 3: Top Supplier (real data) */}
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl md:block hidden">
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">ספק מוביל</p>
-                  <h3 className="text-lg font-bold">תנובה</h3>
-                  <p className="text-[10px] text-[var(--color-primary)] mt-1">₪12,450 (28%)</p>
+                  {topSupplier ? (
+                    <>
+                      <h3 className="text-lg font-bold truncate">{topSupplier[0]}</h3>
+                      <p className="text-[10px] text-[var(--color-primary)] mt-1">₪{topSupplier[1].toLocaleString()} ({topSupplierPct}%)</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-[var(--color-text-muted)] mt-1">אין נתונים</p>
+                  )}
                 </div>
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl md:block hidden relative group overflow-hidden">
-                  <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">סטטוס רו״ח</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
-                    <h3 className="text-sm font-bold">ממתין לסגירה</h3>
-                  </div>
-                  <button
-                    onClick={sendReportToAccountant}
-                    disabled={isSendingReport || filteredExpenses.length === 0}
-                    className="mt-3 w-full bg-[var(--color-primary)]/10 hover:bg-[var(--color-primary)]/20 text-[var(--color-primary)] border border-[var(--color-primary)]/30 py-1.5 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {isSendingReport ? 'שולח...' : 'שלח לרואה חשבון'}
-                  </button>
+
+                {/* Card 4: Price Rise Detector */}
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl md:block hidden relative">
+                  <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">מגמת מחירים ⚡</p>
+                  {priceRiseAlerts.length > 0 ? (
+                    <div className="space-y-1.5 mt-1">
+                      {priceRiseAlerts.slice(0, 2).map(alert => (
+                        <div key={alert.supplier} className="flex items-center justify-between">
+                          <span className="text-[10px] text-white truncate max-w-[100px]">{alert.supplier}</span>
+                          <span className="text-[10px] font-bold text-red-400 flex-shrink-0">+{alert.pct}%</span>
+                        </div>
+                      ))}
+                      {priceRiseAlerts.length > 2 && (
+                        <p className="text-[9px] text-[var(--color-text-muted)]">+{priceRiseAlerts.length - 2} ספקים נוספים</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <div className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></div>
+                      <p className="text-xs text-[var(--color-primary)] font-bold">מחירים יציבים</p>
+                    </div>
+                  )}
+                  {priceRiseAlerts.length > 0 && (
+                    <button
+                      onClick={sendReportToAccountant}
+                      disabled={isSendingReport}
+                      className="mt-2 w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 py-1 rounded-lg text-[9px] font-bold transition-all"
+                    >
+                      שלח התראה לרו״ח
+                    </button>
+                  )}
                 </div>
               </section>
 
