@@ -43,23 +43,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        // gemini-2.5-flash-lite: confirmed multimodal (Vision/image) support
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+        // gemini-2.5-flash: full model for best accuracy on Hebrew invoice tables
+        const model = genAI.getGenerativeModel({
+            model: 'gemini-2.5-flash',
+            generationConfig: { responseMimeType: "application/json" }
+        });
 
-        const prompt = `You are reading an Israeli supplier invoice image.
-Extract EVERY product line from the TABLE. Israeli invoices have columns like:
-  [Product Name] | [Qty] | [Unit Price] | [Total]
-or (RTL): [Total] | [Unit Price] | [Qty] | [Product Name]
+        const prompt = `You are an expert at reading Israeli supplier invoices (חשבוניות ספקים).
+Carefully examine this invoice IMAGE and extract EVERY product line item from the table.
 
-RULES:
-1. quantity = the number in the QUANTITY column. Can be a decimal like 24.60 (weight in kg).
-2. unit = one of these ASCII codes ONLY (no Hebrew, no quotes): unit, kg, gram, liter, ml, case, pack
-3. Verify: quantity x pricePerUnit is approximately equal to totalPrice. If not, re-read.
-4. Hint: if quantity > 5 and looks decimal, unit is probably "kg". Small integers -> "unit".
-5. name = full product name exactly as written.
+Israeli invoices are RTL (right-to-left). The table columns are typically ordered RIGHT to LEFT as:
+  # (row number) | שם פריט (product name) | כמות (quantity) | מחיר ליחידה (unit price) | סה"כ / סכום (line total)
 
-Return ONLY a valid JSON array. No markdown, no explanation, no Hebrew in the JSON keys or unit values:
-[{"name":"Vodka Smirnoff 1L","quantity":2,"unit":"unit","pricePerUnit":89.90,"totalPrice":179.80}]
+EXTRACTION RULES:
+1. "name": The FULL product name in Hebrew exactly as written on the invoice.
+   Include size/weight descriptors that are part of the name (e.g. "צ'יפס אמריקאי (10 קילו)").
+2. "quantity": The value from the QUANTITY COLUMN (כמות). Can be decimal like 24.60 for kg.
+   Do NOT confuse with product weight/size in the name.
+3. "unit": One of these ASCII codes ONLY: unit, kg, gram, liter, ml, case, pack
+   - If quantity > 5 and decimal, likely "kg". Small integer → "unit".
+4. "pricePerUnit": Price PER SINGLE UNIT from the unit-price column BEFORE multiplication.
+5. "totalPrice": LINE TOTAL from the total column AFTER multiplication.
+6. VERIFY: quantity × pricePerUnit ≈ totalPrice (within 5%). If not, re-read.
+
+Return ONLY a valid JSON array. No markdown, no explanation:
+[{"name":"צ'יפס אמריקאי (10 קילו)","quantity":2,"unit":"unit","pricePerUnit":125.00,"totalPrice":250.00}]
 If no items found, return [].`;
 
         const result = await model.generateContent([
