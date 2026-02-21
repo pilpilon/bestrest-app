@@ -246,8 +246,11 @@ function Dashboard() {
 
 
   const sendReportToAccountant = async () => {
-    if (filteredExpenses.length === 0) {
-      setNotification({ type: 'error', message: 'אין נתונים לשליחה' });
+    // Only send expenses that haven't been sent yet
+    const unsentExpenses = filteredExpenses.filter(exp => !exp.isSent);
+
+    if (unsentExpenses.length === 0) {
+      setNotification({ type: 'error', message: 'אין חשבוניות חדשות לשליחה' });
       return;
     }
     if (!accountantEmail) {
@@ -260,7 +263,7 @@ function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          expenses: filteredExpenses,
+          expenses: unsentExpenses,
           userEmail: user?.email,
           userName: user?.displayName,
           accountantEmail,
@@ -269,8 +272,8 @@ function Dashboard() {
       });
       const result = await response.json();
       if (result.success) {
-        // Mark all sent expenses as isSent: true in Firestore
-        const markSentPromises = filteredExpenses.map(exp =>
+        // Mark only the newly sent expenses as isSent: true in Firestore
+        const markSentPromises = unsentExpenses.map(exp =>
           setDoc(doc(db, 'expenses', exp.id), { isSent: true }, { merge: true })
         );
         await Promise.all(markSentPromises);
