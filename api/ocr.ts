@@ -263,20 +263,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             // Extract line items directly with the same model (text-based, reliable)
             try {
-                const itemsPrompt = `Extract every product line item from this Israeli invoice text.
-Return ONLY a valid JSON array, no markdown, no extra text:
-[{"name":"\u05de\u05d5\u05e6\u05e8","quantity":2,"unit":"\u05d9\u05d7'","pricePerUnit":50.00,"totalPrice":100.00}]
+                const ITEMS_PROMPT = `You are extracting line items from an Israeli supplier invoice (חשבונית ספק).
 
-Rules:
-- quantity = how many units ORDERED (look for X 2 or 2 \u05d9\u05d7' patterns, NOT the product size in the name)
-- unit must be one of: \u05d9\u05d7', \u05e7"\u05d2, \u05d2\u05e8\u05dd, \u05dc\u05d9\u05d8\u05e8, \u05de"\u05dc, \u05d0\u05e8\u05d2\u05d6, \u05de\u05d0\u05e8\u05d6
-- pricePerUnit = unit price before multiplying
-- totalPrice = final line total
-If none found return [].
+Israeli invoices typically have these columns (right to left):
+# | שם פריט/מוצר | כמות יח' | ש"מ ליחידה | סכום
+or: פריט | כמות | מחיר ליח' | סה"כ
+
+Column meanings:
+- שם פריט / מוצר = Product name
+- כמות יח' / כמות = QUANTITY (how many ordered). CAN BE DECIMAL (e.g. 24.60 kg of chicken = quantity 24.60 unit kg)
+- ש"מ ליחידה / מחיר ליחידה = PRICE PER UNIT (before multiplication)
+- סכום / סה"כ / ש"כ = LINE TOTAL (quantity × price)
+
+IMPORTANT RULES:
+1. quantity comes from the QUANTITY COLUMN, not from the product name. It can be a decimal like 24.60.
+2. Verify: quantity × pricePerUnit ≈ totalPrice. If not, you picked wrong numbers.
+3. unit: guess from context — if quantity is a large decimal like 24.60, unit is likely ק"ג or גרם. If it's a small integer like 2 or 3, likely יח'.
+4. Use ONLY these units: יח', ק"ג, גרם, ליטר, מ"ל, ארגז, מארז
+5. name: full product name in Hebrew as written on the invoice
+
+Return ONLY a valid JSON array, no markdown:
+[{"name":"המבורגר פרימיום 200","quantity":24.60,"unit":"ק\"ג","pricePerUnit":44.00,"totalPrice":1082.40}]
+If no items, return [].
 
 Invoice text:
 ${rawText.substring(0, 3000)}`;
-                const itemsResult = await model.generateContent(itemsPrompt);
+                const itemsResult = await model.generateContent(ITEMS_PROMPT);
                 let itemsText = itemsResult.response.text().trim();
                 itemsText = itemsText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
                 console.log("Items response (200 chars):", itemsText.substring(0, 200));
@@ -298,10 +310,26 @@ ${rawText.substring(0, 3000)}`;
                     generationConfig: { responseMimeType: "application/json" }
                 });
                 const itemsResult = await itemModel.generateContent(
-                    `Extract every product line item from this Israeli invoice text.
-Return ONLY a valid JSON array, no markdown:
-[{"name":"\u05de\u05d5\u05e6\u05e8","quantity":2,"unit":"\u05d9\u05d7'","pricePerUnit":50,"totalPrice":100}]
-quantity = units ordered (X 2 / 2 \u05d9\u05d7'), NOT product size. unit: \u05d9\u05d7', \u05e7"\u05d2, \u05d2\u05e8\u05dd, \u05dc\u05d9\u05d8\u05e8, \u05de"\u05dc, \u05d0\u05e8\u05d2\u05d6, \u05de\u05d0\u05e8\u05d6
+                    `You are extracting line items from an Israeli supplier invoice (חשבונית ספק).
+
+Israeli invoices typically have these columns (right to left):
+# | שם פריט/מוצר | כמות יח' | ש"מ ליחידה | סכום
+or: פריט | כמות | מחיר ליח' | סה"כ
+
+Column meanings:
+- שם פריט / מוצר = Product name
+- כמות יח' / כמות = QUANTITY ordered. CAN BE DECIMAL (e.g. 24.60 kg)
+- ש"מ ליחידה / מחיר ליחידה = PRICE PER UNIT (before multiplication)
+- סכום / סה"כ = LINE TOTAL (quantity × price)
+
+IMPORTANT:
+1. quantity from the QUANTITY COLUMN, can be decimal like 24.60
+2. Verify: quantity × pricePerUnit ≈ totalPrice
+3. If quantity is a large decimal (>5), unit is likely ק"ג or גרם. Small integer → יח'
+4. units: יח', ק"ג, גרם, ליטר, מ"ל, ארגז, מארז
+
+Return ONLY valid JSON array, no markdown:
+[{"name":"המבורגר פרימיום 200","quantity":24.60,"unit":"ק\"ג","pricePerUnit":44.00,"totalPrice":1082.40}]
 If none return [].
 Text:\n${rawText.substring(0, 3000)}`
                 );
