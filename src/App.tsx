@@ -1,6 +1,5 @@
 import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2 } from 'lucide-react';
-import { utils, write } from 'xlsx';
-import * as FileSaver from 'file-saver';
+import * as XLSX from 'xlsx';
 import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Login } from './Login';
@@ -218,26 +217,15 @@ function Dashboard() {
       }));
 
       console.log("Creating Excel sheet...");
-      const ws = utils.json_to_sheet(dataToExport);
-      const wb = utils.book_new();
-      utils.book_append_sheet(wb, ws, "הוצאות");
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "הוצאות");
 
-      console.log("Writing to buffer...");
-      const wbout = write(wb, { bookType: 'xlsx', type: 'binary' });
-
-      function s2ab(s: string) {
-        const buf = new ArrayBuffer(s.length);
-        const view = new Uint8Array(buf);
-        for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
-        return buf;
-      }
-
-      const blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
       const dateStr = new Date().toISOString().slice(0, 10);
       const fileName = `BestRest_Report_${dateStr}.xlsx`;
 
-      console.log("Saving file via FileSaver:", fileName);
-      FileSaver.saveAs(blob, fileName);
+      console.log("Triggering XLSX.writeFile:", fileName);
+      XLSX.writeFile(wb, fileName);
 
       setNotification({ type: 'success', message: 'קובץ Excel נוצר בהצלחה!' });
     } catch (err) {
