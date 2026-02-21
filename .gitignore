@@ -25,3 +25,10 @@ dist-ssr
 
 .vercel
 .env
+*.json
+!package.json
+!tsconfig.json
+!tsconfig.app.json
+!tsconfig.node.json
+!cors.json
+!package-lock.json
