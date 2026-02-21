@@ -161,16 +161,26 @@ function Dashboard() {
       if (finalData.lineItems && finalData.lineItems.length > 0) {
         for (const item of finalData.lineItems) {
           if (!item.name || !item.pricePerUnit) continue;
-          // Use item name as a normalized key for upsert-like behavior
+
+          // Use canonical name as the document key
           const itemId = item.name.trim().replace(/\s+/g, '_').toLowerCase();
           const itemRef = doc(db, 'businesses', businessId, 'inventory', itemId);
 
-          // Read existing to capture previousPrice
+          // Read existing to capture previousPrice and existing aliases
           const existingSnap = await getDoc(itemRef);
           const existingData = existingSnap.exists() ? existingSnap.data() : null;
 
+          // Build aliases: merge existing ones with rawName (original OCR name) if different
+          const existingAliases: string[] = existingData?.aliases || [];
+          const rawName = item.rawName || item.name; // rawName = original OCR output before user edit
+          const newAliases = Array.from(new Set([
+            ...existingAliases,
+            ...(rawName !== item.name ? [rawName.trim().toLowerCase()] : [])
+          ]));
+
           await setDoc(itemRef, {
             name: item.name,
+            aliases: newAliases,
             lastPrice: item.pricePerUnit,
             previousPrice: existingData?.lastPrice || item.pricePerUnit,
             unit: item.unit || 'unit',
@@ -1140,7 +1150,7 @@ function UsersManagement() {
 }
 
 
-function ReviewModal({
+export function ReviewModal({
   data,
   isSaving,
   allCategories,
@@ -1156,8 +1166,25 @@ function ReviewModal({
   onAddCategory: (category: string) => void
 }) {
   const [editedData, setEditedData] = useState(data);
+  const [lineItems, setLineItems] = useState<any[]>(
+    (data.lineItems || []).map((item: any) => ({ ...item, rawName: item.name }))
+  );
   const [newCategory, setNewCategory] = useState('');
   const [showAddCategory, setShowAddCategory] = useState(false);
+
+  const updateLineItem = (index: number, field: string, value: string | number) => {
+    setLineItems(prev => prev.map((item, i) =>
+      i === index ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const removeLineItem = (index: number) => {
+    setLineItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSave = () => {
+    onSave({ ...editedData, lineItems });
+  };
 
   const handleAddCategory = () => {
     if (newCategory.trim()) {
@@ -1277,42 +1304,84 @@ function ReviewModal({
               </div>
             </div>
 
-            {/* Line Items Table */}
-            {editedData.lineItems && editedData.lineItems.length > 0 && (
+            {/* Line Items Table — Editable */}
+            {lineItems.length > 0 && (
               <div className="pt-4 border-t border-white/5">
                 <p className="text-xs font-bold text-white mb-3 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></span>
-                  פירוט מוצרים ({editedData.lineItems.length})
+                  פירוט מוצרים — ערוך לפני שמירה ({lineItems.length})
                 </p>
-                <div className="max-h-40 overflow-auto rounded-lg border border-white/5">
-                  <table className="w-full text-right text-[10px]">
+                <div className="max-h-52 overflow-auto rounded-lg border border-white/10 bg-black/20">
+                  <table className="w-full text-right text-[11px]">
                     <thead className="bg-white/5 text-[var(--color-text-muted)] sticky top-0">
                       <tr>
-                        <th className="p-2 font-semibold">מוצר</th>
-                        <th className="p-2 font-semibold">כמות</th>
-                        <th className="p-2 font-semibold">מחיר ליחידה</th>
-                        <th className="p-2 font-semibold">סה״כ</th>
+                        <th className="p-2 font-semibold">שם מוצר</th>
+                        <th className="p-2 font-semibold w-16">כמות</th>
+                        <th className="p-2 font-semibold w-16">יחידה</th>
+                        <th className="p-2 font-semibold w-20">מחיר/יחידה (₪)</th>
+                        <th className="p-2 w-8"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {editedData.lineItems.map((item: any, i: number) => (
-                        <tr key={i} className="hover:bg-white/5 transition-colors">
-                          <td className="p-2 text-white font-medium">{item.name}</td>
-                          <td className="p-2 text-[var(--color-text-muted)]">{item.quantity} {item.unit}</td>
-                          <td className="p-2 text-[var(--color-primary)] font-bold">₪{item.pricePerUnit}</td>
-                          <td className="p-2 text-white">₪{item.totalPrice}</td>
+                      {lineItems.map((item: any, i: number) => (
+                        <tr key={i} className="hover:bg-white/5 transition-colors group">
+                          <td className="p-1.5">
+                            <input
+                              type="text"
+                              value={item.name}
+                              onChange={e => updateLineItem(i, 'name', e.target.value)}
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1 text-white outline-none transition-colors text-right"
+                            />
+                          </td>
+                          <td className="p-1.5">
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={e => updateLineItem(i, 'quantity', parseFloat(e.target.value))}
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1 text-white outline-none transition-colors text-center"
+                            />
+                          </td>
+                          <td className="p-1.5">
+                            <input
+                              type="text"
+                              value={item.unit}
+                              onChange={e => updateLineItem(i, 'unit', e.target.value)}
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1 text-white outline-none transition-colors text-center"
+                            />
+                          </td>
+                          <td className="p-1.5">
+                            <input
+                              type="number"
+                              value={item.pricePerUnit}
+                              onChange={e => updateLineItem(i, 'pricePerUnit', parseFloat(e.target.value))}
+                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1 text-[var(--color-primary)] font-bold outline-none transition-colors text-left"
+                              dir="ltr"
+                            />
+                          </td>
+                          <td className="p-1.5">
+                            <button
+                              onClick={() => removeLineItem(i)}
+                              className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-all p-1 rounded"
+                              title="הסר שורה"
+                            >
+                              ✕
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                <p className="text-[9px] text-[var(--color-text-muted)] mt-2 opacity-60">
+                  💡 תיקון שם מוצר? השם הישן יישמר אוטומטית כ-alias לזיהוי עתידי.
+                </p>
               </div>
             )}
           </div>
 
           <div className="flex gap-4 pt-4">
             <button
-              onClick={() => onSave(editedData)}
+              onClick={handleSave}
               disabled={isSaving}
               className="flex-1 bg-[var(--color-primary)] text-slate-900 font-bold py-3 rounded-lg hover:brightness-110 shadow-[0_0_20px_rgba(13,242,128,0.3)] transition-all disabled:opacity-50"
             >

@@ -36,11 +36,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 snapshot.docs.forEach(doc => {
                     const item = doc.data();
                     const itemName = (item.name || '').toLowerCase();
+                    const itemAliases: string[] = (item.aliases || []).map((a: string) => a.toLowerCase());
 
-                    // Calculate match score: how many search terms appear in the item name
+                    // Calculate match score: check name and all aliases
+                    const namesToCheck = [itemName, ...itemAliases];
                     let score = 0;
                     for (const term of searchTerms) {
-                        if (itemName.includes(term)) score++;
+                        if (namesToCheck.some(n => n.includes(term))) score++;
                     }
                     // Also check reverse: item name words in search text
                     const itemWords = itemName.split(/\s+/).filter((w: string) => w.length > 1);
