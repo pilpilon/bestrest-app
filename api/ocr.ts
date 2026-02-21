@@ -82,6 +82,53 @@ ${rawText.substring(0, 3000)}
     };
 }
 
+/**
+ * Pure-code RTL column parser.
+ * Israeli OCR text dumps invoice numbers in RTL order per row: total, pricePerUnit, quantity.
+ * We extract standalone numeric lines, find triplets satisfying (qty × price ≈ total),
+ * then overwrite whatever Gemini extracted with these verified values.
+ * Immune to product-name-number confusion (e.g. "\u05e7\u05e8\u05d8\u05d5\u05e0\u05d9\u05dd 5", "30 \u05d9\u05d7'").
+ */
+function fixLineItemsFromRawText(items: any[], rawText: string): any[] {
+    if (!items.length) return items;
+
+    // Extract standalone numeric lines (handles commas and leading $)
+    const nums: number[] = rawText
+        .split('\n')
+        .map(l => l.trim().replace(/[$,]/g, ''))
+        .filter(l => /^\d+\.?\d*$/.test(l))
+        .map(l => parseFloat(l));
+
+    // Find triplets [a, b, c] where c \u00d7 b \u2248 a (total, price, qty \u2014 RTL order)
+    const triplets: Array<{ total: number; price: number; qty: number }> = [];
+    let i = 0;
+    while (i < nums.length - 2 && triplets.length < items.length) {
+        const [a, b, c] = [nums[i], nums[i + 1], nums[i + 2]];
+        if (b > 0 && c > 0) {
+            const ratio = Math.abs(b * c - a) / (a || 1);
+            if (ratio < 0.02) {
+                triplets.push({ total: a, price: b, qty: c });
+                i += 3;
+                continue;
+            }
+        }
+        i++;
+    }
+
+    if (triplets.length !== items.length) {
+        console.log(`Column parser: ${triplets.length} triplets for ${items.length} items \u2014 skipping`);
+        return items;
+    }
+
+    console.log(`Column parser: correcting ${items.length} items with raw-text column values`);
+    return items.map((item, idx) => ({
+        ...item,
+        quantity: triplets[idx].qty,
+        pricePerUnit: triplets[idx].price,
+        totalPrice: triplets[idx].total,
+    }));
+}
+
 // Helper: extract line items from the original invoice IMAGE using Vision
 async function extractLineItemsFromImage(imageBase64: string, imageMimeType: string, rawTextFallback?: string): Promise<any[]> {
     try {
@@ -294,6 +341,8 @@ ${rawText.substring(0, 3000)}`;
                 console.log("Items response (200 chars):", itemsText.substring(0, 200));
                 const itemsParsed = JSON.parse(itemsText);
                 parsed.lineItems = Array.isArray(itemsParsed) ? itemsParsed : [];
+                // Correct qty/price/total using raw-text column values (RTL triplet parser)
+                parsed.lineItems = fixLineItemsFromRawText(parsed.lineItems, rawText);
                 console.log(`Extracted ${parsed.lineItems.length} line items`);
             } catch (itemsErr) {
                 console.error("Line items extraction failed:", itemsErr);
@@ -336,6 +385,8 @@ Text:\n${rawText.substring(0, 3000)}`
                 let itemsText = itemsResult.response.text().trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
                 const itemsParsed = JSON.parse(itemsText);
                 parsed.lineItems = Array.isArray(itemsParsed) ? itemsParsed : [];
+                // Correct qty/price/total using raw-text column values (RTL triplet parser)
+                parsed.lineItems = fixLineItemsFromRawText(parsed.lineItems, rawText);
             } catch (e) { console.error("Items extraction failed:", e); }
         }
 
