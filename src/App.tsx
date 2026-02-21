@@ -123,9 +123,27 @@ function Dashboard() {
           }
         }
 
+        // Use Vision endpoint for accurate line items (reads the image table directly)
+        let lineItems = result.data.lineItems || [];
+        try {
+          const visionRes = await fetch('/api/ocr-vision-items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageBase64: base64, mimeType: file.type || 'image/jpeg' })
+          });
+          const visionData = await visionRes.json();
+          if (visionData.success && visionData.items && visionData.items.length > 0) {
+            lineItems = visionData.items;
+            console.log(`Vision extracted ${lineItems.length} items`);
+          }
+        } catch (visionErr) {
+          console.warn('Vision items fallback to text-based:', visionErr);
+        }
+
         setOcrResult({
           ...result.data,
           category: finalCategory,
+          lineItems,
           imageUrl: base64Image // Store full base64 data URL
         });
         setIsReviewing(true);
