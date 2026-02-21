@@ -59,11 +59,12 @@ Respond ONLY with valid JSON, no markdown:
 }
 
 For lineItems: Extract every individual product/ingredient line from the invoice.
-- name: item name in Hebrew
-- quantity: amount purchased (number)
-- unit: measurement unit (kg, unit, liter, box, gram, etc.)
-- pricePerUnit: price for ONE unit (number)
-- totalPrice: total for this line (number)
+CRITICAL RULES for line items:
+- name: The full product name in Hebrew (include size/weight if it's part of the name, e.g. "צ'יפס אמריקאי (10 קילו)")
+- quantity: ONLY the NUMBER OF UNITS ORDERED (how many items/boxes/bottles were purchased). This is typically shown as "X 2" or "2 יח'" on Israeli invoices. Do NOT confuse this with the product's weight/size. Example: If the line says "צ'יפס 10 ק"ג X 2" — the quantity is 2 (two bags), NOT 10.
+- unit: Use ONLY one of these Hebrew values: יח', ק"ג, גרם, ליטר, מ"ל, ארגז, מארז
+- pricePerUnit: price for ONE unit (number). This is the price BEFORE multiplication.
+- totalPrice: The final line total AFTER multiplication (quantity × pricePerUnit).
 If you cannot find line items, return an empty array.
 
 Text:
@@ -191,7 +192,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // Extract line items via a separate Gemini call
             try {
                 const itemsResult = await model.generateContent(
-                    `Extract individual line items from this Israeli invoice/receipt. Return ONLY valid JSON array:\n[{"name": "Item name", "quantity": 1.5, "unit": "kg", "pricePerUnit": 5.90, "totalPrice": 8.85}]\nIf no items found return [].\nReceipt text:\n${rawText.substring(0, 3000)}`
+                    `Extract individual line items from this Israeli invoice/receipt.
+
+CRITICAL RULES:
+- "name": Full product name in Hebrew (include size/weight if part of the name, e.g. "צ'יפס אמריקאי (10 קילו)")
+- "quantity": ONLY the NUMBER OF UNITS ORDERED. This is how many items/boxes/bottles were purchased, shown as "X 2" or "2 יח'" on Israeli invoices. Do NOT confuse with the product's weight/size in the name. Example: "צ'יפס 10 ק"ג X 2" → quantity is 2, NOT 10.
+- "unit": Use ONLY one of: יח', ק"ג, גרם, ליטר, מ"ל, ארגז, מארז
+- "pricePerUnit": Price for ONE unit BEFORE multiplication
+- "totalPrice": Final line total AFTER multiplication (quantity × pricePerUnit)
+
+Return ONLY valid JSON array:
+[{"name": "וודקה סמירנוף ליטר", "quantity": 2, "unit": "יח'", "pricePerUnit": 89.90, "totalPrice": 179.80}]
+If no items found return [].
+
+Receipt text:
+${rawText.substring(0, 3000)}`
                 );
                 const itemsParsed = JSON.parse(itemsResult.response.text());
                 parsed.lineItems = Array.isArray(itemsParsed) ? itemsParsed : (itemsParsed?.items || []);
