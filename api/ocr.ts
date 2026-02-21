@@ -16,6 +16,25 @@ const docClient = new DocumentProcessorServiceClient({
         : `${processorLocation}-documentai.googleapis.com`,
 });
 
+
+/**
+ * Safely parse JSON from a Gemini response.
+ * Handles: (1) markdown code fences, (2) unescaped " inside Hebrew strings (e.g. בע"מ).
+ */
+function safeParseJson(raw: string): any {
+    // Strip markdown code fences Gemini sometimes adds
+    let text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+    try {
+        return JSON.parse(text);
+    } catch {
+        // Fix unescaped quotes inside string values — common in Hebrew company names like בע"מ
+        // Strategy: replace any " that is NOT preceded by \ and is inside a string value
+        // Simple heuristic: replace ' that appear mid-word in Hebrew context
+        const fixed = text.replace(/(?<=[\u0590-\u05FF\w])"(?=[\u0590-\u05FF\w])/g, "''");
+        return JSON.parse(fixed);
+    }
+}
+
 // Helper: use Gemini to parse header fields (supplier, total, date, category) from rawText
 async function parseHeadersWithGemini(rawText: string): Promise<{
     supplier: string; total: number; date: string; category: string;
@@ -54,7 +73,7 @@ ${rawText.substring(0, 3000)}
 `;
 
     const result = await model.generateContent(prompt);
-    const parsed = JSON.parse(result.response.text());
+    const parsed = safeParseJson(result.response.text());
     return {
         supplier: parsed.supplier || "לא זוהה",
         total: Number(parsed.total) || 0,
@@ -184,7 +203,7 @@ If no line items found, return [].${textHint}`;
         responseText = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
         console.log("Vision line-items response (300 chars):", responseText.substring(0, 300));
 
-        const parsed = JSON.parse(responseText);
+        const parsed = safeParseJson(responseText);
         let items = Array.isArray(parsed) ? parsed : (parsed?.items || parsed?.lineItems || []);
 
         // Normalize units from English to Hebrew
@@ -221,7 +240,7 @@ If none found return [].
 Text:\n${rawText.substring(0, 3000)}`
         );
         let text = result.response.text().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-        const parsed = JSON.parse(text);
+        const parsed = safeParseJson(text);
         let items = Array.isArray(parsed) ? parsed : [];
         // Normalize units
         items = items.map((item: any) => ({
@@ -333,7 +352,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const catResult = await model.generateContent(
                 `Supplier: ${structuredFields.supplier}. Receipt snippet: ${rawText.substring(0, 300)}\nRespond ONLY with JSON: {"category":"One of: חומרי גלם, שתייה, אלכוהול, ציוד, תחזוקה, שכירות, חשמל, עובדים, כללי"}`
             );
-            const catJson = JSON.parse(catResult.response.text());
+            const catJson = safeParseJson(catResult.response.text());
             parsed = {
                 supplier: structuredFields.supplier!,
                 total: structuredFields.total!,
