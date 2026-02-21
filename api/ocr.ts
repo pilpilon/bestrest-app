@@ -254,6 +254,38 @@ Text:\n${rawText.substring(0, 3000)}`
     }
 }
 
+/**
+ * Deterministic math cross-validation (Section 4.1 of architecture spec)
+ * Returns 'VALID', 'LINE_ITEM_ERROR', or 'TOTAL_MISMATCH'
+ */
+function validateExtraction(lineItems: any[], extractedTotal: number): {
+    status: 'VALID' | 'LINE_ITEM_ERROR' | 'TOTAL_MISMATCH';
+    computedSubtotal: number;
+    failedItems: number[];
+} {
+    let computedSubtotal = 0;
+    const failedItems: number[] = [];
+
+    // Gate 1: qty × price = line total for each row
+    lineItems.forEach((item, i) => {
+        const expected = Number(item.quantity) * Number(item.pricePerUnit);
+        const actual = Number(item.totalPrice);
+        if (actual > 0 && Math.abs(expected - actual) / actual > 0.05) {
+            failedItems.push(i);
+        }
+        computedSubtotal += actual;
+    });
+
+    if (failedItems.length > 0) return { status: 'LINE_ITEM_ERROR', computedSubtotal, failedItems };
+
+    // Gate 2: sum of lines ≈ invoice total (within 10% — tax/discounts may differ)
+    if (extractedTotal > 0 && Math.abs(computedSubtotal - extractedTotal) / extractedTotal > 0.10) {
+        return { status: 'TOTAL_MISMATCH', computedSubtotal, failedItems: [] };
+    }
+
+    return { status: 'VALID', computedSubtotal, failedItems: [] };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -394,10 +426,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
 
+        const validation = validateExtraction(parsed.lineItems, parsed.total);
+        console.log(`Validation: ${validation.status}, computed: ${validation.computedSubtotal}, extracted: ${parsed.total}`);
+
         return res.status(200).json({
             success: true,
             data: {
                 ...parsed,
+                validation,
                 rawText: rawText.substring(0, 1500)
             }
         });
