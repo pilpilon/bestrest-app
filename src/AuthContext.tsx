@@ -54,10 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             setCompletedOnboarding(data.completedOnboarding ?? !!data.businessName);
                             setLoading(false);
                         } else {
-                            // New user or missing profile document
-                            console.log("No user profile found, initializing...");
-                            const newRole = currentUser.email === 'aorus.dev@gmail.com' ? 'admin' : 'manager';
-                            const newBusinessId = 'main_branch';
+                            // New user: create their own isolated business using their UID as the businessId
+                            console.log("New user — creating isolated business...");
+                            const newRole = currentUser.email === 'aorus.dev@gmail.com' ? 'admin' : 'admin';
+                            // Use the user's own UID as their businessId — guarantees isolation
+                            const newBusinessId = currentUser.uid;
 
                             setRole(newRole);
                             setBusinessId(newBusinessId);
