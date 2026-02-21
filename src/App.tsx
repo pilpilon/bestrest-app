@@ -8,9 +8,9 @@ import { Cookbook } from './Cookbook';
 import { useRef, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+// Firebase Storage import removed — uploads now go directly to OCR API as base64
 import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
-import { db, storage } from './firebase';
+import { db } from './firebase';
 
 function Dashboard() {
   const { user, role, businessId, businessName, logout } = useAuth();
@@ -52,40 +52,52 @@ function Dashboard() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    const storageRef = ref(storage, `receipts/${user.uid}/${Date.now()}_${file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    // Create a local preview URL (no Firebase Storage needed for scan)
+    const localPreviewUrl = URL.createObjectURL(file);
 
-    uploadTask.on('state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setUploadProgress(progress);
-      },
-      (error) => {
-        console.error("Upload failed", error);
-        setUploadProgress(null);
-      },
-      async () => {
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        console.log("File available at", downloadURL);
-        setUploadProgress(null);
+    // Show 0% progress while encoding
+    setUploadProgress(0);
 
-        // Trigger OCR API
-        try {
-          const response = await fetch('/api/ocr', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageUrl: downloadURL })
-          });
-          const result = await response.json();
-          if (result.success) {
-            setOcrResult({ ...result.data, imageUrl: downloadURL });
-            setIsReviewing(true);
-          }
-        } catch (err) {
-          console.error("OCR API failed", err);
-        }
+    try {
+      // Read file as base64 and send directly to OCR API — no CORS issues
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Strip the data URL prefix (e.g. "data:image/jpeg;base64,")
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      setUploadProgress(50);
+
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64,
+          mimeType: file.type || 'image/jpeg',
+        })
+      });
+
+      setUploadProgress(100);
+      const result = await response.json();
+
+      if (result.success) {
+        setOcrResult({ ...result.data, imageUrl: localPreviewUrl });
+        setIsReviewing(true);
+      } else {
+        console.error('OCR API error:', result.error);
       }
-    );
+    } catch (err) {
+      console.error('OCR processing failed:', err);
+    } finally {
+      setUploadProgress(null);
+      // Reset file input so the same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const triggerUpload = () => {

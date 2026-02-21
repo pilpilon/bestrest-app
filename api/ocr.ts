@@ -2,7 +2,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import vision from '@google-cloud/vision';
 
 // Initialize the Vision client
-// In production, GOOGLE_APPLICATION_CREDENTIALS should be set in Vercel environment variables
+// In production, GOOGLE_APPLICATION_CREDENTIALS_JSON should be set in Vercel environment variables
 const client = new vision.ImageAnnotatorClient({
     credentials: process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
         ? JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON)
@@ -14,15 +14,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { imageUrl } = req.body;
+    const { imageUrl, imageBase64, mimeType } = req.body;
 
-    if (!imageUrl) {
-        return res.status(400).json({ error: 'Missing imageUrl' });
+    if (!imageUrl && !imageBase64) {
+        return res.status(400).json({ error: 'Missing imageUrl or imageBase64' });
     }
 
     try {
-        // Perform text detection on the image URL
-        const [result] = await client.textDetection(imageUrl);
+        // Build the image descriptor for Vision API
+        // Prefer base64 (direct upload) over URL to avoid CORS / auth issues
+        const imageInput = imageBase64
+            ? { content: imageBase64 }
+            : { source: { imageUri: imageUrl } };
+
+        // Perform text detection
+        const [result] = await client.textDetection({ image: imageInput });
         const detections = result.textAnnotations;
 
         if (!detections || detections.length === 0) {
@@ -93,7 +99,7 @@ ${rawText}
             const totalMatch = rawText.match(/(?:סה["״]כ|Total|סכום)\s*[:]?\s*(\d+(?:\.\d{1,2})?)/i);
             parsedData.total = totalMatch ? parseFloat(totalMatch[1]) : 0;
 
-            const dateMatch = rawText.match(/(\d{1,2}[\/\.]\d{1,2}[\/\.]\d{2,4})/);
+            const dateMatch = rawText.match(/(\d{1,2}[\/\.]d{1,2}[\/\.]\d{2,4})/);
             parsedData.date = dateMatch ? dateMatch[1] : new Date().toLocaleDateString('he-IL');
             parsedData.category = "בתהליך...";
         }
