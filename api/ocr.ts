@@ -5,7 +5,7 @@ import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
 const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
 // Location where the processor was created (set DOCUMENT_AI_LOCATION env var if different from 'eu')
-const processorLocation = process.env.DOCUMENT_AI_LOCATION || 'us';
+const processorLocation = process.env.DOCUMENT_AI_LOCATION || 'eu';
 
 const docClient = new DocumentProcessorServiceClient({
     credentials: credentialsJson ? JSON.parse(credentialsJson) : undefined,
@@ -30,7 +30,16 @@ Instructions:
 - "supplier": The business/company name issuing the invoice (e.g., "חברת החשמל לישראל", "תנובה").
 - "total": The final total amount to pay as a NUMBER (look for "סה\"כ לתשלום", "סה\"כ כולל מע\"מ"). Must be a number, no currency symbols.
 - "date": The invoice/receipt date formatted as dd/mm/yyyy. Look for "תאריך עריכת החשבון" or similar. NOT a future due date.
-- "category": Pick ONE: חומרי גלם | שתייה | אלכוהול | ציוד | תחזוקה | שכירות | חשמל | עובדים | כללי
+- "category": Pick the best ONE based on the supplier name and content:
+  חומרי גלם (food ingredients, produce, meat, dairy - e.g. תנובה, יטבתה, מחלבות)
+  שתייה (beverages - e.g. קוקה קולה, נביעות, טרה)
+  אלכוהול (wine, beer, spirits)
+  ציוד (kitchen equipment, utensils)
+  תחזוקה (repairs, cleaning services, pest control)
+  שכירות (rent, lease)
+  עובדים (salary, manpower agencies)
+  חשמל / מים / גז (utilities - e.g. חברת החשמל, תעש, גז, מקורות)
+  כללי (anything else)
 
 Respond ONLY with valid JSON, no markdown:
 {

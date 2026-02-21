@@ -715,6 +715,7 @@ function ReviewModal({ data, isSaving, onClose, onSave }: { data: any, isSaving:
                 <option value="תחזוקה">תחזוקה</option>
                 <option value="שכירות">שכירות</option>
                 <option value="עובדים">עובדים</option>
+                <option value="חשמל / מים / גז">חשמל / מים / גז</option>
                 <option value="כללי">כללי</option>
               </select>
             </div>
