@@ -206,18 +206,34 @@ function Dashboard() {
       return;
     }
     try {
+      // Use a hidden iframe to receive the download — avoids SPA interference
+      const iframeName = 'export_frame_' + Date.now();
+      const iframe = document.createElement('iframe');
+      iframe.name = iframeName;
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = '/api/export';
+      form.target = iframeName; // submit into the iframe
       form.style.display = 'none';
+
       const input = document.createElement('input');
       input.type = 'hidden';
       input.name = 'expenses';
       input.value = JSON.stringify(filteredExpenses);
       form.appendChild(input);
+
       document.body.appendChild(form);
       form.submit();
-      document.body.removeChild(form);
+
+      // Cleanup after download starts
+      setTimeout(() => {
+        document.body.removeChild(form);
+        document.body.removeChild(iframe);
+      }, 5000);
+
       setNotification({ type: 'success', message: 'קובץ CSV נוצר בהצלחה ✓' });
     } catch (err) {
       console.error('Export error:', err);
