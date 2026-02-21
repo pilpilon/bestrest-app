@@ -1,5 +1,5 @@
 import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2 } from 'lucide-react';
-import { utils, writeFile } from 'xlsx';
+import { utils, write } from 'xlsx';
 import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Login } from './Login';
@@ -217,8 +217,20 @@ function Dashboard() {
       const ws = utils.json_to_sheet(dataToExport);
       const wb = utils.book_new();
       utils.book_append_sheet(wb, ws, "הוצאות");
+
+      const wbout = write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
       const dateStr = new Date().toISOString().slice(0, 10);
-      writeFile(wb, `BestRest_${dateStr}.xlsx`);
+
+      a.href = url;
+      a.download = `BestRest_${dateStr}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
       setNotification({ type: 'success', message: 'קובץ Excel נוצר בהצלחה!' });
     } catch (err) {
       console.error('Excel export error:', err);
