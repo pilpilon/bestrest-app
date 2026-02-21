@@ -19,6 +19,7 @@ const docClient = new DocumentProcessorServiceClient({
 // Helper: use Gemini to parse all fields from rawText
 async function parseWithGemini(rawText: string): Promise<{
     supplier: string; total: number; date: string; category: string;
+    lineItems: { name: string; quantity: number; unit: string; pricePerUnit: number; totalPrice: number }[];
 }> {
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -51,8 +52,19 @@ Respond ONLY with valid JSON, no markdown:
   "supplier": "string",
   "total": 1234.56,
   "date": "dd/mm/yyyy",
-  "category": "string"
+  "category": "string",
+  "lineItems": [
+    { "name": "Item name in Hebrew", "quantity": 1.5, "unit": "kg", "pricePerUnit": 5.90, "totalPrice": 8.85 }
+  ]
 }
+
+For lineItems: Extract every individual product/ingredient line from the invoice.
+- name: item name in Hebrew
+- quantity: amount purchased (number)
+- unit: measurement unit (kg, unit, liter, box, gram, etc.)
+- pricePerUnit: price for ONE unit (number)
+- totalPrice: total for this line (number)
+If you cannot find line items, return an empty array.
 
 Text:
 ${rawText.substring(0, 3000)}
@@ -64,7 +76,8 @@ ${rawText.substring(0, 3000)}
         supplier: parsed.supplier || "לא זוהה",
         total: Number(parsed.total) || 0,
         date: parsed.date || new Date().toLocaleDateString('he-IL'),
-        category: parsed.category || "כללי"
+        category: parsed.category || "כללי",
+        lineItems: Array.isArray(parsed.lineItems) ? parsed.lineItems : []
     };
 }
 
@@ -145,7 +158,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!rawText) {
-        return res.status(200).json({ success: true, data: { supplier: "לא זוהה", total: 0, date: new Date().toLocaleDateString('he-IL'), category: "כללי", rawText: "" } });
+        return res.status(200).json({ success: true, data: { supplier: "לא זוהה", total: 0, date: new Date().toLocaleDateString('he-IL'), category: "כללי", lineItems: [], rawText: "" } });
     }
 
     // --- Step 2: Use Gemini to parse fields if Document AI didn't return them ---
@@ -154,7 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const hasStructured =
             structuredFields.supplier && structuredFields.total && structuredFields.date;
 
-        let parsed: { supplier: string; total: number; date: string; category: string };
+        let parsed: { supplier: string; total: number; date: string; category: string; lineItems: any[] };
 
         if (hasStructured) {
             console.log("Document AI entities OK, asking Gemini for category only");
@@ -171,8 +184,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 supplier: structuredFields.supplier!,
                 total: structuredFields.total!,
                 date: structuredFields.date!,
-                category: catJson.category || "כללי"
+                category: catJson.category || "כללי",
+                lineItems: []
             };
+
+            // Extract line items via a separate Gemini call
+            try {
+                const itemsResult = await model.generateContent(
+                    `Extract individual line items from this Israeli invoice/receipt. Return ONLY valid JSON array:\n[{"name": "Item name", "quantity": 1.5, "unit": "kg", "pricePerUnit": 5.90, "totalPrice": 8.85}]\nIf no items found return [].\nReceipt text:\n${rawText.substring(0, 3000)}`
+                );
+                const itemsParsed = JSON.parse(itemsResult.response.text());
+                parsed.lineItems = Array.isArray(itemsParsed) ? itemsParsed : (itemsParsed?.items || []);
+            } catch (itemsErr) {
+                console.error("Line items extraction failed:", itemsErr);
+            }
         } else {
             // Full parse with Gemini
             console.log("Document AI entities missing, using Gemini full parse");

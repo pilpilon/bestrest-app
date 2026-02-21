@@ -8,7 +8,7 @@ import { useRef, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 // Firebase Storage import removed — uploads now go directly to OCR API as base64
-import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 function Dashboard() {
@@ -156,6 +156,32 @@ function Dashboard() {
         businessId: businessId,
         createdAt: serverTimestamp(),
       });
+
+      // Save line items to inventory collection
+      if (finalData.lineItems && finalData.lineItems.length > 0) {
+        for (const item of finalData.lineItems) {
+          if (!item.name || !item.pricePerUnit) continue;
+          // Use item name as a normalized key for upsert-like behavior
+          const itemId = item.name.trim().replace(/\s+/g, '_').toLowerCase();
+          const itemRef = doc(db, 'businesses', businessId, 'inventory', itemId);
+
+          // Read existing to capture previousPrice
+          const existingSnap = await getDoc(itemRef);
+          const existingData = existingSnap.exists() ? existingSnap.data() : null;
+
+          await setDoc(itemRef, {
+            name: item.name,
+            lastPrice: item.pricePerUnit,
+            previousPrice: existingData?.lastPrice || item.pricePerUnit,
+            unit: item.unit || 'unit',
+            supplier: finalData.supplier || '',
+            lastDate: finalData.date || new Date().toLocaleDateString('he-IL'),
+            quantity: item.quantity || 1,
+            updatedAt: serverTimestamp(),
+          }, { merge: true });
+        }
+      }
+
       setIsReviewing(false);
       setOcrResult(null);
       setNotification({ type: 'success', message: 'החשבונית נשמרה בהצלחה! ✓' });
@@ -1250,6 +1276,38 @@ function ReviewModal({
                 {data.rawText}
               </div>
             </div>
+
+            {/* Line Items Table */}
+            {editedData.lineItems && editedData.lineItems.length > 0 && (
+              <div className="pt-4 border-t border-white/5">
+                <p className="text-xs font-bold text-white mb-3 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></span>
+                  פירוט מוצרים ({editedData.lineItems.length})
+                </p>
+                <div className="max-h-40 overflow-auto rounded-lg border border-white/5">
+                  <table className="w-full text-right text-[10px]">
+                    <thead className="bg-white/5 text-[var(--color-text-muted)] sticky top-0">
+                      <tr>
+                        <th className="p-2 font-semibold">מוצר</th>
+                        <th className="p-2 font-semibold">כמות</th>
+                        <th className="p-2 font-semibold">מחיר ליחידה</th>
+                        <th className="p-2 font-semibold">סה״כ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {editedData.lineItems.map((item: any, i: number) => (
+                        <tr key={i} className="hover:bg-white/5 transition-colors">
+                          <td className="p-2 text-white font-medium">{item.name}</td>
+                          <td className="p-2 text-[var(--color-text-muted)]">{item.quantity} {item.unit}</td>
+                          <td className="p-2 text-[var(--color-primary)] font-bold">₪{item.pricePerUnit}</td>
+                          <td className="p-2 text-white">₪{item.totalPrice}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-4 pt-4">

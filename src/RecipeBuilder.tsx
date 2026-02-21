@@ -7,6 +7,8 @@ export interface Ingredient {
     rawText: string;
     matchedItem?: string;
     cost?: number;
+    source?: 'inventory' | 'ai_estimate';
+    priceChange?: number;
 }
 
 export interface Recipe {
@@ -49,7 +51,7 @@ export function RecipeBuilder({ initialData, onBack, onSave }: RecipeBuilderProp
             if (result.success) {
                 setIngredients(prev => prev.map(ing =>
                     ing.id === ingredientId
-                        ? { ...ing, cost: result.data.cost, matchedItem: result.data.matchedItem }
+                        ? { ...ing, cost: result.data.cost, matchedItem: result.data.matchedItem, source: result.data.source, priceChange: result.data.priceChange }
                         : ing
                 ));
             }
@@ -257,7 +259,19 @@ export function RecipeBuilder({ initialData, onBack, onSave }: RecipeBuilderProp
                                     <p className="font-medium text-sm text-white">{ing.rawText}</p>
                                     {ing.matchedItem || ing.cost ? (
                                         <div className="flex flex-col mt-1">
-                                            <p className="text-[10px] text-green-400 flex items-center gap-1">✨ {ing.matchedItem || 'זוהה מהמלאי'}</p>
+                                            <div className="flex items-center gap-2">
+                                                {ing.source === 'inventory' ? (
+                                                    <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">מהמלאי</span>
+                                                ) : (
+                                                    <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded font-bold">הערכת AI</span>
+                                                )}
+                                                <p className="text-[10px] text-gray-400">{ing.matchedItem || 'זוהה'}</p>
+                                                {ing.priceChange && ing.priceChange !== 0 ? (
+                                                    <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${ing.priceChange > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+                                                        {ing.priceChange > 0 ? '▲' : '▼'}{Math.abs(ing.priceChange)}%
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                             <p className="text-[10px] text-[var(--color-primary)] font-bold">₪{ing.cost}</p>
                                         </div>
                                     ) : (
