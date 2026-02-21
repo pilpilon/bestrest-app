@@ -206,31 +206,26 @@ function Dashboard() {
       return;
     }
     try {
-      // BOM + CSV rows for proper Hebrew rendering in Excel
-      const BOM = '\uFEFF';
-      const headers = ['תאריך', 'ספק', 'קטגוריה', 'סכום', 'נשלח לרו"ח'];
-      const rows = filteredExpenses.map(exp =>
-        [exp.date, exp.supplier, exp.category, exp.total, exp.isSent ? 'כן' : 'לא'].join(',')
-      );
-      const csvContent = BOM + [headers.join(','), ...rows].join('\n');
-
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const fileName = `BestRest_Report_${dateStr}.csv`;
-
-      // Use data: URI — works in every browser without any library
-      const link = document.createElement('a');
-      link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
-      link.setAttribute('download', fileName);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      setNotification({ type: 'success', message: 'קובץ CSV נוצר (נפתח ב-Excel) ✓' });
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/api/export';
+      form.style.display = 'none';
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'expenses';
+      input.value = JSON.stringify(filteredExpenses);
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+      setNotification({ type: 'success', message: 'קובץ CSV נוצר בהצלחה ✓' });
     } catch (err) {
       console.error('Export error:', err);
       setNotification({ type: 'error', message: 'שגיאה בייצוא. נסה שוב.' });
     }
   };
+
+
 
   const sendReportToAccountant = async () => {
     if (filteredExpenses.length === 0) {
