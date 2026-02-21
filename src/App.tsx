@@ -1200,220 +1200,220 @@ export function ReviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300" dir="rtl">
-      <div className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col md:flex-row shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-0 md:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300" dir="rtl">
+      <div className="bg-[#0f172a] md:border md:border-white/10 md:rounded-2xl w-full max-w-5xl h-full md:h-auto md:max-h-[90vh] overflow-hidden flex flex-col md:flex-row shadow-2xl">
 
-        {/* Left: Receipt Preview */}
-        <div className="w-full md:w-1/2 bg-black/40 flex items-center justify-center p-4 overflow-auto">
-          <img src={data.imageUrl} alt="Receipt Preview" className="max-w-full h-auto rounded shadow-lg" />
+        {/* Left: Receipt Preview (Top on mobile) */}
+        <div className="w-full md:w-1/2 h-1/3 md:h-full bg-black/60 flex items-center justify-center p-2 md:p-4 overflow-auto border-b md:border-b-0 md:border-l border-white/5">
+          <img src={data.imageUrl} alt="Receipt Preview" className="max-w-full max-h-full object-contain rounded shadow-lg" />
         </div>
 
-        {/* Right: Data Entry Form */}
-        <div className="w-full md:w-1/2 p-6 flex flex-col space-y-6">
-          <div className="flex justify-between items-center">
+        {/* Right: Data Entry Form (Bottom on mobile) */}
+        <div className="w-full md:w-1/2 flex-1 flex flex-col min-h-0 bg-[#0f172a]">
+          {/* Header */}
+          <div className="p-4 md:p-6 border-b border-white/5 flex justify-between items-center bg-[#0f172a]/80 backdrop-blur-md sticky top-0 z-20">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <Receipt className="w-6 h-6 text-[var(--color-primary)]" />
               אימות נתוני חשבונית
             </h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+            <button onClick={onClose} className="p-2 -mr-2 text-gray-400 hover:text-white transition-colors">
               <Plus className="w-6 h-6 rotate-45" />
             </button>
           </div>
 
-          <div className="space-y-4 flex-1 overflow-auto px-1">
-            <div className="space-y-2">
-              <label className="text-xs text-[var(--color-text-muted)] font-medium">ספק / עסק</label>
-              <input
-                type="text"
-                value={editedData.supplier}
-                onChange={(e) => setEditedData({ ...editedData, supplier: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs text-[var(--color-text-muted)] font-medium">סכום כולל (₪)</label>
-                <input
-                  type="number"
-                  value={editedData.total}
-                  onChange={(e) => setEditedData({ ...editedData, total: parseFloat(e.target.value) })}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors font-mono"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs text-[var(--color-text-muted)] font-medium">תאריך</label>
+                <label className="text-xs text-[var(--color-text-muted)] font-medium">ספק / עסק</label>
                 <input
                   type="text"
-                  value={editedData.date}
-                  onChange={(e) => setEditedData({ ...editedData, date: e.target.value })}
+                  value={editedData.supplier}
+                  onChange={(e) => setEditedData({ ...editedData, supplier: e.target.value })}
                   className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="text-xs text-[var(--color-text-muted)] font-medium">קטגוריה</label>
-                {!showAddCategory && (
-                  <button
-                    onClick={() => setShowAddCategory(true)}
-                    className="text-[10px] text-[var(--color-primary)] hover:underline"
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-[var(--color-text-muted)] font-medium">סכום כולל (₪)</label>
+                  <input
+                    type="number"
+                    value={editedData.total}
+                    onChange={(e) => setEditedData({ ...editedData, total: parseFloat(e.target.value) })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-[var(--color-text-muted)] font-medium">תאריך</label>
+                  <input
+                    type="text"
+                    value={editedData.date}
+                    onChange={(e) => setEditedData({ ...editedData, date: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-[var(--color-text-muted)] font-medium">קטגוריה</label>
+                  {!showAddCategory && (
+                    <button
+                      onClick={() => setShowAddCategory(true)}
+                      className="text-[10px] text-[var(--color-primary)] hover:underline"
+                    >
+                      + קטגוריה חדשה
+                    </button>
+                  )}
+                </div>
+
+                {!showAddCategory ? (
+                  <select
+                    value={editedData.category}
+                    onChange={(e) => setEditedData({ ...editedData, category: e.target.value })}
+                    className="w-full bg-[#0f172a] border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
                   >
-                    + קטגוריה חדשה
-                  </button>
+                    {allCategories.map(cat => (
+                      <option key={cat} value={cat} style={{ backgroundColor: '#0f172a', color: '#fff' }}>{cat}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="שם הקטגוריה..."
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleAddCategory}
+                      className="bg-[var(--color-primary)] text-slate-900 px-4 rounded-lg font-bold text-sm"
+                    >
+                      הוסף
+                    </button>
+                    <button
+                      onClick={() => setShowAddCategory(false)}
+                      className="px-4 border border-white/10 text-white rounded-lg text-sm"
+                    >
+                      ביטול
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {!showAddCategory ? (
-                <select
-                  value={editedData.category}
-                  onChange={(e) => setEditedData({ ...editedData, category: e.target.value })}
-                  className="w-full bg-[#0f172a] border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
-                >
-                  {allCategories.map(cat => (
-                    <option key={cat} value={cat} style={{ backgroundColor: '#0f172a', color: '#fff' }}>{cat}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="שם הקטגוריה..."
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    className="flex-1 bg-white/5 border border-white/10 rounded-lg p-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors"
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleAddCategory}
-                    className="bg-[var(--color-primary)] text-slate-900 px-4 rounded-lg font-bold text-sm"
-                  >
-                    הוסף
-                  </button>
-                  <button
-                    onClick={() => setShowAddCategory(false)}
-                    className="px-4 border border-white/10 text-white rounded-lg text-sm"
-                  >
-                    ביטול
-                  </button>
+              <div className="pt-4 border-t border-white/5">
+                <p className="text-[10px] text-[var(--color-text-muted)] mb-2 font-mono uppercase tracking-[2px]">AI Raw Transcription</p>
+                <div className="bg-black/20 rounded p-3 text-[10px] text-gray-500 max-h-32 overflow-auto font-mono leading-relaxed">
+                  {data.rawText}
+                </div>
+              </div>
+
+              {/* Line Items Table — Editable */}
+              {lineItems.length > 0 && (
+                <div className="pt-4 border-t border-white/5">
+                  <p className="text-xs font-bold text-white mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></span>
+                    פירוט מוצרים ({lineItems.length})
+                  </p>
+                  <div className="overflow-x-auto rounded border border-white/10 bg-black/20">
+                    <table className="w-full text-right text-[11px] border-collapse min-w-[350px]">
+                      <thead className="bg-[#1a1f2e] text-[var(--color-text-muted)] sticky top-0 z-10 shadow-sm">
+                        <tr>
+                          <th className="p-2 font-semibold text-right">שם מוצר</th>
+                          <th className="p-2 font-semibold text-center w-16">כמות</th>
+                          <th className="p-2 font-semibold text-center w-16">יחידה</th>
+                          <th className="p-2 font-semibold text-left w-20">מחיר (₪)</th>
+                          <th className="p-2 w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {lineItems.map((item: any, i: number) => (
+                          <tr key={i} className="hover:bg-white/5 transition-colors group">
+                            <td className="p-1 min-w-[120px]">
+                              <input
+                                type="text"
+                                value={item.name}
+                                onChange={e => updateLineItem(i, 'name', e.target.value)}
+                                className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-white outline-none transition-colors text-right"
+                              />
+                            </td>
+                            <td className="p-1">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.quantity || ''}
+                                onChange={e => {
+                                  const val = parseFloat(e.target.value);
+                                  updateLineItem(i, 'quantity', isNaN(val) ? '' : val);
+                                }}
+                                className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-1 py-1.5 text-white outline-none transition-colors text-center"
+                              />
+                            </td>
+                            <td className="p-1">
+                              <select
+                                value={item.unit || ''}
+                                onChange={e => updateLineItem(i, 'unit', e.target.value)}
+                                className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-0 py-1.5 text-white outline-none transition-colors text-center appearance-none cursor-pointer"
+                                dir="rtl"
+                              >
+                                <option value="" disabled className="bg-[#1a1f2e] text-gray-400">בחר</option>
+                                <option value="יח'" className="bg-[#1a1f2e] text-white">יח'</option>
+                                <option value="ק״ג" className="bg-[#1a1f2e] text-white">ק״ג</option>
+                                <option value="גרם" className="bg-[#1a1f2e] text-white">גרם</option>
+                                <option value="ליטר" className="bg-[#1a1f2e] text-white">ליטר</option>
+                                <option value="מ״ל" className="bg-[#1a1f2e] text-white">מ״ל</option>
+                                <option value="ארגז" className="bg-[#1a1f2e] text-white">ארגז</option>
+                                <option value="מארז" className="bg-[#1a1f2e] text-white">מארז</option>
+                              </select>
+                            </td>
+                            <td className="p-1">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.pricePerUnit || ''}
+                                onChange={e => {
+                                  const val = parseFloat(e.target.value);
+                                  updateLineItem(i, 'pricePerUnit', isNaN(val) ? '' : val);
+                                }}
+                                className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-1 py-1.5 text-[var(--color-primary)] font-bold outline-none transition-colors text-left font-mono"
+                                dir="ltr"
+                              />
+                            </td>
+                            <td className="p-1">
+                              <button
+                                onClick={() => removeLineItem(i)}
+                                className="text-red-400/50 hover:text-red-400 transition-all p-1"
+                                title="הסר שורה"
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
-
-            <div className="pt-4 border-t border-white/5">
-              <p className="text-[10px] text-[var(--color-text-muted)] mb-2 font-mono uppercase tracking-[2px]">AI Raw Transcription</p>
-              <div className="bg-black/20 rounded p-3 text-[10px] text-gray-500 max-h-32 overflow-auto font-mono leading-relaxed">
-                {data.rawText}
-              </div>
-            </div>
-
-            {/* Line Items Table — Editable */}
-            {lineItems.length > 0 && (
-              <div className="pt-4 border-t border-white/5">
-                <p className="text-xs font-bold text-white mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse"></span>
-                  פירוט מוצרים — ערוך לפני שמירה ({lineItems.length})
-                </p>
-                <div className="max-h-52 overflow-auto rounded border border-white/10 bg-black/20">
-                  <table className="w-full text-right text-[11px] border-collapse">
-                    <thead className="bg-[#1a1f2e] text-[var(--color-text-muted)] sticky top-0 z-10 shadow-sm">
-                      <tr>
-                        <th className="p-2 font-semibold text-right">שם מוצר</th>
-                        <th className="p-2 font-semibold text-center w-20">כמות</th>
-                        <th className="p-2 font-semibold text-center w-20">יחידה</th>
-                        <th className="p-2 font-semibold text-left w-24">מחיר/יח' (₪)</th>
-                        <th className="p-2 w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {lineItems.map((item: any, i: number) => (
-                        <tr key={i} className="hover:bg-white/5 transition-colors group">
-                          <td className="p-1 w-full relative">
-                            <input
-                              type="text"
-                              value={item.name}
-                              onChange={e => updateLineItem(i, 'name', e.target.value)}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-white outline-none transition-colors text-right"
-                            />
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.quantity || ''}
-                              onChange={e => {
-                                const val = parseFloat(e.target.value);
-                                updateLineItem(i, 'quantity', isNaN(val) ? '' : val);
-                              }}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-white outline-none transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                          </td>
-                          <td className="p-1">
-                            <select
-                              value={item.unit || ''}
-                              onChange={e => updateLineItem(i, 'unit', e.target.value)}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-1 py-1.5 text-white outline-none transition-colors text-center appearance-none cursor-pointer"
-                              dir="rtl"
-                            >
-                              <option value="" disabled className="bg-[#1a1f2e] text-gray-400">בחר</option>
-                              <option value="יח'" className="bg-[#1a1f2e] text-white">יח'</option>
-                              <option value="ק״ג" className="bg-[#1a1f2e] text-white">ק״ג</option>
-                              <option value="גרם" className="bg-[#1a1f2e] text-white">גרם</option>
-                              <option value="ליטר" className="bg-[#1a1f2e] text-white">ליטר</option>
-                              <option value="מ״ל" className="bg-[#1a1f2e] text-white">מ״ל</option>
-                              <option value="ארגז" className="bg-[#1a1f2e] text-white">ארגז</option>
-                              <option value="מארז" className="bg-[#1a1f2e] text-white">מארז</option>
-                            </select>
-                          </td>
-                          <td className="p-1">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.pricePerUnit || ''}
-                              onChange={e => {
-                                const val = parseFloat(e.target.value);
-                                updateLineItem(i, 'pricePerUnit', isNaN(val) ? '' : val);
-                              }}
-                              className="w-full bg-white/5 border border-transparent focus:border-[var(--color-primary)]/50 rounded px-2 py-1.5 text-[var(--color-primary)] font-bold outline-none transition-colors text-left [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              dir="ltr"
-                            />
-                          </td>
-                          <td className="p-1.5">
-                            <button
-                              onClick={() => removeLineItem(i)}
-                              className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-all p-1 rounded"
-                              title="הסר שורה"
-                            >
-                              ✕
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <p className="text-[9px] text-[var(--color-text-muted)] mt-2 opacity-60">
-                  💡 תיקון שם מוצר? השם הישן יישמר אוטומטית כ-alias לזיהוי עתידי.
-                </p>
-              </div>
-            )}
           </div>
 
-          <div className="flex gap-4 pt-4">
+          <div className="p-4 md:p-6 border-t border-white/5 bg-[#0f172a] shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-20 flex gap-4">
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 bg-[var(--color-primary)] text-slate-900 font-bold py-3 rounded-lg hover:brightness-110 shadow-[0_0_20px_rgba(13,242,128,0.3)] transition-all disabled:opacity-50"
+              className="flex-1 bg-[var(--color-primary)] text-slate-900 font-bold py-3.5 rounded-xl hover:brightness-110 shadow-[0_0_20px_rgba(13,242,128,0.2)] transition-all disabled:opacity-50 active:scale-[0.98]"
             >
               {isSaving ? 'שומר...' : 'אישור ושמירה'}
             </button>
             <button
               onClick={onClose}
               disabled={isSaving}
-              className="px-6 py-3 border border-white/10 text-white font-medium rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50"
+              className="px-6 py-3.5 border border-white/10 text-white font-medium rounded-xl hover:bg-white/5 transition-colors disabled:opacity-50"
             >
               ביטול
             </button>
