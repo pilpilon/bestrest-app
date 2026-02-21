@@ -1,31 +1,84 @@
-import { useState } from 'react';
-import { Plus, Search, ChevronLeft, ChefHat, Info } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, ChevronLeft, ChefHat, Info, Trash2, Target, TrendingUp } from 'lucide-react';
 import { RecipeBuilder } from './RecipeBuilder';
-
-interface Recipe {
-    id: string;
-    name: string;
-    targetPrice: number;
-    calculatedCost: number;
-    ingredientsCount: number;
-    lastUpdated: string;
-}
-
-// Temporary Mock Data
-const MOCK_RECIPES: Recipe[] = [
-    { id: '1', name: 'סלמון נורבגי במיסו', targetPrice: 120, calculatedCost: 35.5, ingredientsCount: 6, lastUpdated: '12/10/2023' },
-    { id: '2', name: 'קרפצ׳יו בקר', targetPrice: 65, calculatedCost: 18.2, ingredientsCount: 5, lastUpdated: '10/10/2023' },
-    { id: '3', name: 'סלט קיסר עוף', targetPrice: 55, calculatedCost: 12.0, ingredientsCount: 8, lastUpdated: '15/10/2023' },
-];
+import type { Recipe } from './RecipeBuilder';
+import { useAuth } from './AuthContext';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { db } from './firebase';
 
 export function Cookbook() {
+    const { businessId } = useAuth();
+    const [recipes, setRecipes] = useState<Recipe[]>([]);
+    const [loading, setLoading] = useState(true);
     const [isBuilding, setIsBuilding] = useState(false);
+    const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const filteredRecipes = MOCK_RECIPES.filter(r => r.name.includes(searchQuery));
+    // Profit Calculator State
+    const [targetProfit, setTargetProfit] = useState<string>('');
 
-    if (isBuilding) {
-        return <RecipeBuilder onBack={() => setIsBuilding(false)} />;
+    const HEBREW_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+    const todayHebrew = HEBREW_DAYS[new Date().getDay()];
+
+    useEffect(() => {
+        if (!businessId) return;
+
+        const q = query(
+            collection(db, 'businesses', businessId, 'recipes'),
+            orderBy('name', 'asc')
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recipe));
+            setRecipes(docs);
+            setLoading(false);
+        }, (error) => {
+            console.error("Firestore recipes fetch error:", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [businessId]);
+
+    const handleSaveRecipe = async (recipeData: any) => {
+        if (!businessId) return;
+
+        const { id, ...data } = recipeData;
+
+        if (id) {
+            // Update existing
+            await setDoc(doc(db, 'businesses', businessId, 'recipes', id), data, { merge: true });
+        } else {
+            // Add new
+            await addDoc(collection(db, 'businesses', businessId, 'recipes'), data);
+        }
+    };
+
+    const handleDeleteRecipe = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!businessId || !window.confirm('האם אתה בטוח שברצונך למחוק מתכון זה?')) return;
+        await deleteDoc(doc(db, 'businesses', businessId, 'recipes', id));
+    };
+
+    const filteredRecipes = recipes.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    // Profit Calculation Logic
+    const avgMargin = recipes.length > 0
+        ? recipes.reduce((sum, r) => sum + (r.targetPrice - r.calculatedCost), 0) / recipes.length
+        : 0;
+
+    const targetValue = parseFloat(targetProfit) || 0;
+    const dishesPerMonth = avgMargin > 0 ? targetValue / avgMargin : 0;
+    const dishesPerDay = dishesPerMonth / 30;
+
+    if (isBuilding || editingRecipe) {
+        return (
+            <RecipeBuilder
+                initialData={editingRecipe}
+                onBack={() => { setIsBuilding(false); setEditingRecipe(null); }}
+                onSave={handleSaveRecipe}
+            />
+        );
     }
 
     return (
@@ -33,7 +86,7 @@ export function Cookbook() {
             {/* Header Section */}
             <section className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-black flex items-center gap-3">
+                    <h2 className="text-2xl font-black flex items-center gap-3 text-white">
                         <div className="w-10 h-10 rounded-xl bg-[var(--color-primary)]/20 flex items-center justify-center border border-[var(--color-primary)]/40 text-[var(--color-primary)]">
                             <ChefHat className="w-6 h-6" />
                         </div>
@@ -48,20 +101,48 @@ export function Cookbook() {
                     className="bg-[var(--color-primary)] text-slate-900 py-2.5 px-6 rounded-xl font-bold text-sm flex items-center gap-2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:brightness-110 transition-all shrink-0"
                 >
                     <Plus className="w-5 h-5" />
-                    מתכון חדש לחמישי
+                    מתכון חדש ל{todayHebrew}
                 </button>
             </section>
 
             {/* KPI / Info Bar */}
-            <section className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center gap-4">
-                <div className="p-3 bg-blue-500/10 rounded-full text-blue-400">
-                    <Info className="w-5 h-5" />
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 flex items-center gap-4">
+                    <div className="p-3 bg-blue-500/10 rounded-full text-blue-400">
+                        <Info className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-sm text-white">איך זה עובד?</h4>
+                        <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                            עלויות המרכיבים מתעדכנות בזמן אמת מסריקת החשבוניות (OCR). ה-Food Cost המוצג כאן מבוסס תמיד על המחיר האחרון ששילמת.
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h4 className="font-bold text-sm">איך זה עובד?</h4>
-                    <p className="text-xs text-[var(--color-text-muted)] mt-1">
-                        עלויות המרכיבים מתעדכנות בזמן אמת מסריקת החשבוניות (OCR). ה-Food Cost המוצג כאן מבוסס תמיד על המחיר האחרון ששילמת.
-                    </p>
+
+                {/* Surprise Feature: Profit Target Calculator */}
+                <div className="bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/20 rounded-2xl p-4 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-bold text-xs text-[var(--color-primary)] flex items-center gap-2">
+                            <Target className="w-4 h-4" />
+                            יעד רווח חודשי (₪)
+                        </h4>
+                        <TrendingUp className="w-4 h-4 text-[var(--color-primary)] opacity-50" />
+                    </div>
+                    <div className="flex items-end gap-3">
+                        <input
+                            type="number"
+                            placeholder="כמה תרצו להרוויח?"
+                            value={targetProfit}
+                            onChange={(e) => setTargetProfit(e.target.value)}
+                            className="bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-[var(--color-primary)] font-bold w-full focus:outline-none focus:border-[var(--color-primary)]/50 transition-all"
+                        />
+                        {targetValue > 0 && (
+                            <div className="shrink-0 text-left">
+                                <p className="text-[10px] text-[var(--color-text-muted)] leading-tight">עליך למכור כ-</p>
+                                <p className="text-sm font-black text-white">{Math.ceil(dishesPerDay)} מנות/יום</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </section>
 
@@ -73,13 +154,17 @@ export function Cookbook() {
                     placeholder="חיפוש מנה..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pr-12 pl-4 text-sm focus:outline-none focus:border-[var(--color-primary)]/50 transition-colors"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pr-12 pl-4 text-sm focus:outline-none focus:border-[var(--color-primary)]/50 transition-colors text-white"
                 />
             </div>
 
             {/* Recipes Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredRecipes.map((recipe) => {
+                {loading ? (
+                    <div className="col-span-full py-20 text-center">
+                        <div className="inline-block w-8 h-8 border-4 border-white/10 border-t-[var(--color-primary)] rounded-full animate-spin"></div>
+                    </div>
+                ) : filteredRecipes.map((recipe) => {
                     const foodCostPercent = (recipe.calculatedCost / recipe.targetPrice) * 100;
                     let statusColor = 'text-[var(--color-primary)]'; // Good (< 30%)
                     let statusBg = 'bg-[var(--color-primary)]/10';
@@ -93,9 +178,20 @@ export function Cookbook() {
                     }
 
                     return (
-                        <div key={recipe.id} className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-all cursor-pointer group flex flex-col h-full">
+                        <div
+                            key={recipe.id}
+                            onClick={() => setEditingRecipe(recipe)}
+                            className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-all cursor-pointer group flex flex-col h-full relative"
+                        >
+                            <button
+                                onClick={(e) => handleDeleteRecipe(e, recipe.id)}
+                                className="absolute top-4 left-4 p-2 rounded-lg bg-red-500/10 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+
                             <div className="flex justify-between items-start mb-4">
-                                <h3 className="text-lg font-bold group-hover:text-[var(--color-primary)] transition-colors">{recipe.name}</h3>
+                                <h3 className="text-lg font-bold text-white group-hover:text-[var(--color-primary)] transition-colors">{recipe.name}</h3>
                                 <ChevronLeft className="w-5 h-5 text-[var(--color-text-muted)] opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
                             </div>
 
@@ -103,7 +199,7 @@ export function Cookbook() {
                                 <div className="flex justify-between items-end border-b border-white/5 pb-3">
                                     <div>
                                         <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-bold mb-1">מחיר מכירה</p>
-                                        <p className="font-bold">₪{recipe.targetPrice}</p>
+                                        <p className="font-bold text-white">₪{recipe.targetPrice}</p>
                                     </div>
                                     <div className="text-left">
                                         <p className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-bold mb-1">עלות מרכיבים</p>
@@ -126,15 +222,17 @@ export function Cookbook() {
                 })}
 
                 {/* Empty State / Add New Card */}
-                <button
-                    onClick={() => setIsBuilding(true)}
-                    className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-[var(--color-text-muted)] hover:bg-white/5 hover:border-[var(--color-primary)]/30 hover:text-[var(--color-primary)] transition-all h-full min-h-[200px]"
-                >
-                    <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
-                        <Plus className="w-6 h-6" />
-                    </div>
-                    <span className="font-bold">בניית מנה חדשה</span>
-                </button>
+                {!loading && (
+                    <button
+                        onClick={() => setIsBuilding(true)}
+                        className="border-2 border-dashed border-white/10 rounded-2xl p-6 flex flex-col items-center justify-center text-[var(--color-text-muted)] hover:bg-white/5 hover:border-[var(--color-primary)]/30 hover:text-[var(--color-primary)] transition-all h-full min-h-[200px]"
+                    >
+                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
+                            <Plus className="w-6 h-6" />
+                        </div>
+                        <span className="font-bold">בניית מנה חדשה</span>
+                    </button>
+                )}
             </div>
         </div>
     );
