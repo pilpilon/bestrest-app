@@ -4,11 +4,16 @@ import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
 // Parse credentials and config from env
 const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
-// Location where the processor was created (set DOCUMENT_AI_LOCATION env var if different from 'eu')
+// Location where the processor was created (set DOCUMENT_AI_LOCATION env var, e.g. 'eu' or 'us')
 const processorLocation = process.env.DOCUMENT_AI_LOCATION || 'eu';
 
+// IMPORTANT: For non-US processors, we MUST use the regional API endpoint.
+// Using the default (US) endpoint for an EU processor causes INVALID_ARGUMENT errors.
 const docClient = new DocumentProcessorServiceClient({
     credentials: credentialsJson ? JSON.parse(credentialsJson) : undefined,
+    apiEndpoint: processorLocation === 'us'
+        ? 'documentai.googleapis.com'
+        : `${processorLocation}-documentai.googleapis.com`,
 });
 
 // Helper: use Gemini to parse all fields from rawText
