@@ -11,7 +11,7 @@ export interface MarketInsight {
     unit: string;
 }
 
-export function generateMarketInsights(expenses: any[]): MarketInsight[] {
+export async function generateMarketInsights(expenses: any[]): Promise<MarketInsight[]> {
     // 1. Flatten all line items from all invoices
     const allItems: any[] = [];
     expenses.forEach(exp => {
@@ -37,7 +37,7 @@ export function generateMarketInsights(expenses: any[]): MarketInsight[] {
 
     allItems.forEach(item => {
         const currentHighest = highestPrices.get(item.name);
-        // Only care about items that cost more than 10 shekels (to make the insights visually impressive)
+        // Only care about items that cost more than 10 shekels
         if (item.price > 10) {
             if (!currentHighest || item.price > currentHighest.price) {
                 highestPrices.set(item.name, { price: item.price, unit: item.unit });
@@ -47,25 +47,39 @@ export function generateMarketInsights(expenses: any[]): MarketInsight[] {
 
     // Convert map back to array and sort by price descending
     const sortedExpenses = Array.from(highestPrices.entries())
-        .map(([itemName, data]) => ({ itemName, ...data }))
+        .map(([itemName, data]) => ({ name: itemName, ...data }))
         .sort((a, b) => b.price - a.price);
 
-    // Take top 3
-    const topExpenesives = sortedExpenses.slice(0, 3);
+    // 3. Take top 10 most expensive items to send to the AI
+    const topTen = sortedExpenses.slice(0, 10);
 
-    // 3. Generate Mock Insights
-    // We simulate that the market average is consistently better for these expensive items.
-    return topExpenesives.map((item, index) => {
-        // Generate a pseudo-random savings percentage between 12% and 18% based on the index
-        const savingsPct = 12 + (index * 2.5);
-        const marketPrice = item.price * (1 - (savingsPct / 100));
+    // 4. Call the Market Insights API
+    try {
+        const response = await fetch('/api/market-insights', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ items: topTen })
+        });
 
-        return {
-            itemName: item.itemName,
-            userPrice: item.price,
-            marketPrice: parseFloat(marketPrice.toFixed(2)),
-            savingsPct: parseFloat(savingsPct.toFixed(1)),
-            unit: item.unit
-        };
-    });
+        if (!response.ok) {
+            throw new Error(`API returned status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.success && Array.isArray(data.insights)) {
+            // 5. Select the 3 items with highest savings percentage
+            const sortedInsights = data.insights.sort((a: MarketInsight, b: MarketInsight) => b.savingsPct - a.savingsPct);
+
+            // Return only those that actually have savings
+            return sortedInsights.filter((i: MarketInsight) => i.savingsPct > 0).slice(0, 3);
+        }
+
+        return [];
+    } catch (error) {
+        console.error("Failed to fetch market insights from API:", error);
+        return [];
+    }
 }

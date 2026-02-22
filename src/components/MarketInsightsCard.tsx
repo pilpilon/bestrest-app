@@ -4,10 +4,11 @@ import type { MarketInsight } from '../utils/marketInsights';
 interface MarketInsightsCardProps {
     insights: MarketInsight[];
     subscriptionTier: 'free' | 'pro';
+    loading?: boolean;
     onRequireUpgrade: () => void;
 }
 
-export function MarketInsightsCard({ insights, subscriptionTier, onRequireUpgrade }: MarketInsightsCardProps) {
+export function MarketInsightsCard({ insights, subscriptionTier, loading, onRequireUpgrade }: MarketInsightsCardProps) {
     const isFree = subscriptionTier === 'free';
     const hasData = insights.length > 0;
 
@@ -61,7 +62,22 @@ export function MarketInsightsCard({ insights, subscriptionTier, onRequireUpgrad
                 {/* Content (Blurred if free, clear if pro) */}
                 <div className={`space-y-4 ${isFree ? 'opacity-30 pointer-events-none select-none filter blur-[2px]' : ''}`}>
 
-                    {!hasData ? (
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
+                            <div className="relative">
+                                <div className="w-12 h-12 rounded-full border border-blue-500/30 flex items-center justify-center bg-blue-500/10 animate-pulse">
+                                    <Lightbulb className="w-5 h-5 text-blue-400" />
+                                </div>
+                                <div className="absolute inset-0 rounded-full border border-blue-400/50 animate-ping opacity-20"></div>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-blue-400 text-sm mb-1 line-clamp-1">Gemini AI מנתח מחירי שוק...</h4>
+                                <p className="text-xs text-[var(--color-text-muted)] max-w-xs text-balance">
+                                    אנחנו משווים את מחירי הקנייה שלך לממוצע הסיטונאי בישראל
+                                </p>
+                            </div>
+                        </div>
+                    ) : !hasData ? (
                         <div className="flex flex-col items-center justify-center py-6 text-center space-y-3">
                             <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center bg-white/5 animate-pulse">
                                 <Lightbulb className="w-5 h-5 text-[var(--color-text-muted)] opacity-50" />

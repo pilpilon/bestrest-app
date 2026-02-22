@@ -295,6 +295,9 @@ function Dashboard() {
   });
 
   const [marketInsightsData, setMarketInsightsData] = useState<MarketInsight[]>([]);
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [insightsCacheKey, setInsightsCacheKey] = useState<number>(0);
+
 
   useEffect(() => {
     if (notification) {
@@ -303,11 +306,37 @@ function Dashboard() {
     }
   }, [notification]);
 
-  // Generate market insights whenever expenses change
+  // --- Market Insights AI Effect ---
   useEffect(() => {
-    const insights = generateMarketInsights(expenses);
-    setMarketInsightsData(insights);
-  }, [expenses]);
+    let isMounted = true;
+
+    const fetchInsights = async () => {
+      // Basic cache invalidation key: number of expenses. 
+      // In a real app, you might hash the latest expense dates.
+      const currentCacheKey = expenses.length;
+
+      if (expenses.length > 0 && currentCacheKey !== insightsCacheKey) {
+        setLoadingInsights(true);
+        try {
+          const insights = await generateMarketInsights(expenses);
+          if (isMounted) {
+            setMarketInsightsData(insights);
+            setInsightsCacheKey(currentCacheKey);
+          }
+        } catch (error) {
+          console.error("Error fetching market insights:", error);
+        } finally {
+          if (isMounted) setLoadingInsights(false);
+        }
+      }
+    };
+
+    fetchInsights();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [expenses, insightsCacheKey]);
 
   const handleExport = () => {
     if (filteredExpenses.length === 0) {
@@ -670,9 +699,10 @@ function Dashboard() {
               <section>
                 <MarketInsightsCard
                   insights={marketInsightsData}
-                  subscriptionTier={subscriptionTier as 'free' | 'pro'}
+                  subscriptionTier={subscriptionTier}
+                  loading={loadingInsights}
                   onRequireUpgrade={() => {
-                    setUpgradeFeature('תובנות חכמות השוואת מחירים (Market AI)');
+                    setUpgradeFeature('השוואת מחירי ספקים לממוצע השוק');
                     setShowUpgradeModal(true);
                   }}
                 />
