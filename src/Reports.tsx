@@ -155,7 +155,7 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
         return Array.from(itemsMap.entries())
             .map(([name, data]) => ({ name, ...data }))
             .sort((a, b) => b.amount - a.amount)
-            .slice(0, 50); // Top 50 items
+            .slice(0, 5); // Top 5 items
     }, [filteredExpenses]);
 
 
@@ -361,15 +361,15 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
                             <h3 className="font-bold flex items-center gap-2 mb-4">
                                 <Store className="w-5 h-5 text-purple-400" /> השוואת ספקים (טופ 10)
                             </h3>
-                            <div className="flex-1 min-h-0">
+                            <div className="flex-1 min-h-0" dir="ltr">
                                 {supplierComparisonData.length > 0 ? (
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={supplierComparisonData} layout="vertical" margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
+                                        <BarChart data={supplierComparisonData} layout="vertical" margin={{ left: 10, right: 10, top: 0, bottom: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={true} vertical={false} />
-                                            <XAxis type="number" stroke="#94A3B8" fontSize={10} tickFormatter={v => `₪${v}`} axisLine={false} tickLine={false} />
-                                            <YAxis dataKey="name" type="category" stroke="#94A3B8" fontSize={10} width={90} axisLine={false} tickLine={false} />
+                                            <XAxis type="number" reversed={true} stroke="#94A3B8" fontSize={10} tickFormatter={v => `₪${v}`} axisLine={false} tickLine={false} />
+                                            <YAxis dataKey="name" type="category" orientation="right" stroke="#94A3B8" fontSize={10} width={120} axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10, textAnchor: 'start', dx: 5 }} />
                                             <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
-                                            <Bar dataKey="total" name="סה״כ" fill="var(--color-secondary)" radius={[0, 4, 4, 0]} barSize={20}>
+                                            <Bar dataKey="total" name="סה״כ" fill="var(--color-secondary)" radius={[4, 0, 0, 4]} barSize={20}>
                                                 {supplierComparisonData.map((_, index) => (
                                                     <Cell key={`cell-${index}`} fill={`hsl(217, 91%, ${60 - (index * 2)}%)`} />
                                                 ))}
