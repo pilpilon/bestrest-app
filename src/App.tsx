@@ -20,6 +20,9 @@ import { ScanQueuePanel } from './components/ScanQueuePanel';
 // Firebase Storage import removed — uploads now go directly to OCR API as base64
 import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
+import { RefundPolicy } from './pages/RefundPolicy';
 
 function Dashboard() {
   const { user, role, businessId, businessName, logout, subscriptionTier, ocrScansToday, incrementOcrScan } = useAuth();
@@ -1799,6 +1802,23 @@ export function ReviewModal({
 function MainApp() {
   const { user, completedOnboarding, loading } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => setCurrentPath(window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const handleBackFromLegal = () => {
+    window.history.pushState({}, '', '/');
+    setCurrentPath('/');
+  };
+
+  if (currentPath === '/privacy-policy') return <PrivacyPolicy onBack={handleBackFromLegal} />;
+  if (currentPath === '/terms-of-service') return <TermsOfService onBack={handleBackFromLegal} />;
+  if (currentPath === '/refund-policy') return <RefundPolicy onBack={handleBackFromLegal} />;
+
   console.log("MainApp Render:", { user: !!user, completedOnboarding, loading });
 
   if (loading) {

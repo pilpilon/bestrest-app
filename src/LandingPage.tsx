@@ -231,6 +231,13 @@ export function LandingPage({ onLogin }: LandingPageProps) {
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
     };
 
+    const navigateToLegal = (page: 'privacy' | 'terms' | 'refund') => {
+        const path = page === 'privacy' ? '/privacy-policy' : page === 'terms' ? '/terms-of-service' : '/refund-policy';
+        window.history.pushState({}, '', path);
+        // Dispatch popstate so App.tsx effect catches it
+        window.dispatchEvent(new PopStateEvent('popstate'));
+    };
+
     if (currentLegalPage === 'privacy') return <PrivacyPolicy onBack={() => setCurrentLegalPage(null)} />;
     if (currentLegalPage === 'terms') return <TermsOfService onBack={() => setCurrentLegalPage(null)} />;
     if (currentLegalPage === 'refund') return <RefundPolicy onBack={() => setCurrentLegalPage(null)} />;
@@ -720,9 +727,9 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                         © {new Date().getFullYear()} BestRest — מנהל המסעדה החכם
                     </p>
                     <div className="flex flex-wrap items-center justify-center gap-6 text-xs" style={{ color: C.muted }}>
-                        <button onClick={() => setCurrentLegalPage('privacy')} className="hover:text-white transition-colors">מדיניות פרטיות</button>
-                        <button onClick={() => setCurrentLegalPage('terms')} className="hover:text-white transition-colors">תנאי שימוש</button>
-                        <button onClick={() => setCurrentLegalPage('refund')} className="hover:text-white transition-colors">מדיניות החזרים ותשלומים</button>
+                        <button onClick={() => navigateToLegal('privacy')} className="hover:text-white transition-colors">מדיניות פרטיות</button>
+                        <button onClick={() => navigateToLegal('terms')} className="hover:text-white transition-colors">תנאי שימוש</button>
+                        <button onClick={() => navigateToLegal('refund')} className="hover:text-white transition-colors">מדיניות החזרים ותשלומים</button>
                     </div>
                 </div>
             </footer>
