@@ -1109,6 +1109,30 @@ function Dashboard() {
   );
 }
 
+
+function MediaPreview({ src, alt, className }: { src: string, alt: string, className?: string }) {
+  const isPdf = src.startsWith('data:application/pdf') || src.toLowerCase().endsWith('.pdf');
+
+  if (isPdf) {
+    return (
+      <iframe
+        src={src}
+        title={alt}
+        className={`${className} bg-white shadow-inner`}
+        style={{ scrollbarWidth: 'thin' }}
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+    />
+  );
+}
+
 function ImagePreviewModal({ expense, onClose }: { expense: any, onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300" dir="rtl">
@@ -1123,10 +1147,10 @@ function ImagePreviewModal({ expense, onClose }: { expense: any, onClose: () => 
           </button>
         </div>
         <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-black/20">
-          <img
+          <MediaPreview
             src={expense.imageUrl}
             alt="Invoice"
-            className="max-w-full h-auto rounded-lg shadow-2xl border border-white/5"
+            className="max-w-full w-full h-full object-contain rounded-lg shadow-2xl border border-white/5"
           />
         </div>
       </div>
@@ -1192,7 +1216,13 @@ function ReportPreviewModal({
             <div key={exp.id || i} className="flex items-center justify-between bg-white/5 rounded-xl p-3 gap-3">
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 {exp.imageUrl ? (
-                  <img src={exp.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-white/10 flex-shrink-0" />
+                  exp.imageUrl.startsWith('data:application/pdf') ? (
+                    <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 border border-red-500/20">
+                      <Receipt className="w-5 h-5 text-red-400" />
+                    </div>
+                  ) : (
+                    <img src={exp.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-white/10 flex-shrink-0" />
+                  )
                 ) : (
                   <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
                     <Receipt className="w-4 h-4 text-gray-500" />
@@ -1546,8 +1576,8 @@ export function ReviewModal({
       <div className="bg-[#0f172a] md:border md:border-white/10 md:rounded-2xl w-full max-w-5xl h-full md:h-auto md:max-h-[90vh] overflow-hidden flex flex-col md:flex-row shadow-2xl">
 
         {/* Left: Receipt Preview (Top on mobile) */}
-        <div className="w-full md:w-1/2 h-1/3 md:h-full bg-black/60 flex items-center justify-center p-2 md:p-4 overflow-auto border-b md:border-b-0 md:border-l border-white/5">
-          <img src={data.imageUrl} alt="Receipt Preview" className="max-w-full max-h-full object-contain rounded shadow-lg" />
+        <div className="w-full md:w-1/2 h-1/3 md:h-full bg-black/60 flex items-center justify-center p-2 md:p-4 overflow-hidden border-b md:border-b-0 md:border-l border-white/5">
+          <MediaPreview src={data.imageUrl} alt="Receipt Preview" className="w-full h-full object-contain rounded shadow-lg" />
         </div>
 
         {/* Right: Data Entry Form (Bottom on mobile) */}
