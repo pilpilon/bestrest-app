@@ -249,8 +249,8 @@ function Dashboard() {
         for (const item of finalData.lineItems) {
           if (!item.name || !item.pricePerUnit) continue;
 
-          // Use canonical name as the document key
-          const itemId = item.name.trim().replace(/\s+/g, '_').toLowerCase();
+          // Use canonical name as the document key. Replace spaces and slashes (which break Firestore paths).
+          const itemId = item.name.trim().replace(/[\s/\\.]+/g, '_').toLowerCase();
           const itemRef = doc(db, 'businesses', businessId, 'inventory', itemId);
 
           // Read existing to capture previousPrice and existing aliases
