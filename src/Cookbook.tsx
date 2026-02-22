@@ -22,8 +22,7 @@ export function Cookbook() {
     // Profit Calculator State
     const [targetProfit, setTargetProfit] = useState<string>('');
 
-    const HEBREW_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
-    const todayHebrew = HEBREW_DAYS[new Date().getDay()];
+
 
     useEffect(() => {
         if (!businessId) return;
@@ -168,13 +167,6 @@ export function Cookbook() {
                         </button>
                     </div>
 
-                    <button
-                        onClick={() => setIsBuilding(true)}
-                        className="bg-[var(--color-primary)] text-slate-900 py-2.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:brightness-110 transition-all"
-                    >
-                        <Plus className="w-5 h-5" />
-                        מתכון חדש ל{todayHebrew}
-                    </button>
                 </div>
             </section>
 
