@@ -153,12 +153,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Prepare Attachments for Resend
+    const attachments = expenses
+      .filter((exp: any) => exp.imageUrl && exp.imageUrl.startsWith('data:'))
+      .map((exp: any, index: number) => {
+        // Resend needs pure base64 without the data URI prefix
+        const base64Data = exp.imageUrl.split(',')[1];
+
+        // Extract content type to get extension
+        const contentTypePart = exp.imageUrl.split(';')[0];
+        const contentType = contentTypePart.split(':')[1] || 'image/jpeg';
+        const extension = contentType.split('/')[1] || 'jpg';
+
+        // Sanitize supplier name for safe filename
+        const safeSupplier = (exp.supplier || 'invoice')
+          .replace(/[^a-z0-9א-ת]/gi, '_')
+          .substring(0, 20);
+        const safeDate = (exp.date || new Date().toISOString().split('T')[0])
+          .replace(/[^0-9]/g, '-');
+
+        return {
+          filename: `${safeSupplier}_${safeDate}_${index + 1}.${extension}`,
+          content: base64Data,
+        };
+      });
+
     const { data, error } = await resend.emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: [accountantEmail],
       replyTo: userEmail, // Accountant can reply directly to the restaurant owner
       subject: `📊 דוח הוצאות — ${businessName || 'מסעדה'} — ${monthYear}`,
       html: htmlContent,
+      attachments: attachments.length > 0 ? attachments : undefined,
     });
 
     if (error) {
