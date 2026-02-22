@@ -630,18 +630,16 @@ function Dashboard() {
               </section>
 
               {/* Market Insights AI Card */}
-              {marketInsightsData.length > 0 && (
-                <section>
-                  <MarketInsightsCard
-                    insights={marketInsightsData}
-                    subscriptionTier={subscriptionTier as 'free' | 'pro'}
-                    onRequireUpgrade={() => {
-                      setUpgradeFeature('תובנות חכמות השוואת מחירים (Market AI)');
-                      setShowUpgradeModal(true);
-                    }}
-                  />
-                </section>
-              )}
+              <section>
+                <MarketInsightsCard
+                  insights={marketInsightsData}
+                  subscriptionTier={subscriptionTier as 'free' | 'pro'}
+                  onRequireUpgrade={() => {
+                    setUpgradeFeature('תובנות חכמות השוואת מחירים (Market AI)');
+                    setShowUpgradeModal(true);
+                  }}
+                />
+              </section>
 
               {/* Analytics Charts Section */}
               <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
