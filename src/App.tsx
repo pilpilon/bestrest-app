@@ -112,39 +112,63 @@ function Dashboard() {
     const fileName = file.name;
 
     try {
-      const base64DataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-            const MAX_DIMENSION = 1600;
-            if (width > height && width > MAX_DIMENSION) {
-              height *= MAX_DIMENSION / width;
-              width = MAX_DIMENSION;
-            } else if (height > MAX_DIMENSION) {
-              width *= MAX_DIMENSION / height;
-              height = MAX_DIMENSION;
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+      let base64DataUrl: string;
+      let uploadMimeType: string;
+
+      if (isPdf) {
+        // For PDFs: read directly as base64, no canvas conversion needed
+        base64DataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (typeof event.target?.result === 'string') {
+              resolve(event.target.result); // already a data URL
+            } else {
+              reject('Failed to read PDF');
             }
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return reject('No canvas context');
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.7));
           };
-          img.onerror = reject;
-          if (typeof event.target?.result === 'string') {
-            img.src = event.target.result;
-          } else {
-            reject('Failed to read file');
-          }
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        uploadMimeType = 'application/pdf';
+      } else {
+        // For images: resize via canvas to reduce payload
+        base64DataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              let width = img.width;
+              let height = img.height;
+              const MAX_DIMENSION = 1600;
+              if (width > height && width > MAX_DIMENSION) {
+                height *= MAX_DIMENSION / width;
+                width = MAX_DIMENSION;
+              } else if (height > MAX_DIMENSION) {
+                width *= MAX_DIMENSION / height;
+                height = MAX_DIMENSION;
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (!ctx) return reject('No canvas context');
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.onerror = reject;
+            if (typeof event.target?.result === 'string') {
+              img.src = event.target.result;
+            } else {
+              reject('Failed to read file');
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        uploadMimeType = 'image/jpeg';
+      }
 
       // Add to Firestore queue
       await addJob(jobId, fileName, base64DataUrl);
@@ -161,7 +185,7 @@ function Dashboard() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               imageBase64: base64,
-              mimeType: file.type || 'image/jpeg',
+              mimeType: uploadMimeType,
             })
           });
           const result = await response.json();

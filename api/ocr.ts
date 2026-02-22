@@ -347,8 +347,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     }
 
-    // If Document AI got no text at all, fall back to Vision
-    if (!rawText && credentialsJson) {
+    // If Document AI got no text at all, fall back to Vision (only for images, not PDFs)
+    const isPdfMimeType = (mimeType || '').toLowerCase() === 'application/pdf';
+    if (!rawText && credentialsJson && !isPdfMimeType) {
         try {
             const vision = await import('@google-cloud/vision');
             const visionClient = new vision.default.ImageAnnotatorClient({
@@ -416,11 +417,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }];
         } else {
             try {
-                console.log("Extracting line items via Gemini Vision (image-based)...");
-                parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg', rawText);
+                if (isPdfMimeType) {
+                    // PDFs can't be sent as inlineData to Gemini Vision — use text-based extraction
+                    console.log("PDF detected — using text-based line item extraction...");
+                    parsed.lineItems = await extractLineItemsFromText(rawText);
+                } else {
+                    console.log("Extracting line items via Gemini Vision (image-based)...");
+                    parsed.lineItems = await extractLineItemsFromImage(imageBase64, mimeType || 'image/jpeg', rawText);
+                }
                 // Fix swapped qty/price where math is ambiguous (e.g. 2.5x150=375 and 150x2.5=375)
                 parsed.lineItems = fixSwappedQtyPrice(parsed.lineItems);
-                console.log(`Vision extracted ${parsed.lineItems.length} line items from image`);
+                console.log(`Extracted ${parsed.lineItems.length} line items`);
             } catch (itemsErr) {
                 console.error("Line items extraction failed:", itemsErr);
             }
