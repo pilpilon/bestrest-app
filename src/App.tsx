@@ -843,9 +843,9 @@ function Dashboard() {
 
         {/* Bottom Navigation Bar */}
         <nav className="fixed bottom-0 inset-x-0 bg-white/5 backdrop-blur-md border-t border-white/10 px-6 py-3 z-50 rounded-t-2xl">
-          <div className="flex items-center justify-between max-w-md mx-auto relative" dir="rtl">
+          <div className="flex items-center justify-around max-w-md mx-auto relative" dir="rtl">
 
-            {/* 1. Dashboard (Far Right in RTL) */}
+            {/* 1. Dashboard */}
             <button
               onClick={() => setCurrentView('dashboard')}
               className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'dashboard' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
@@ -863,19 +863,7 @@ function Dashboard() {
               <span className="text-[10px] font-medium">מתכונים</span>
             </button>
 
-            {/* 3. CENTER FLOATING BUTTON (Add Invoice) */}
-            {role !== 'accountant' ? (
-              <button
-                onClick={triggerUpload}
-                className="bg-[var(--color-primary)] text-slate-900 p-3 rounded-full absolute -top-10 left-1/2 -translate-x-1/2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:scale-110 transition-transform active:scale-95 z-50"
-              >
-                <Plus className="w-6 h-6" />
-              </button>
-            ) : (
-              <div className="w-12 h-12"></div> /* spacing placeholder if no button */
-            )}
-
-            {/* 4. Settings (Far Left in RTL) */}
+            {/* 3. Settings */}
             <button
               onClick={() => setCurrentView('users')}
               className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'users' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
