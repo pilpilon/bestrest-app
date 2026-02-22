@@ -3,9 +3,8 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// The "from" address — requires domain verification in Resend dashboard.
-// For local/staging, Resend allows sending unverified from onboarding@resend.dev
-const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+// The "from" address
+const FROM_EMAIL = 'hello@bestrestapp.com';
 const FROM_NAME = 'BestRest Expense Reports';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
