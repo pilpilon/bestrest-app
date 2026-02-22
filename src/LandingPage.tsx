@@ -294,7 +294,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
 
     return (
         <div
-            className="min-h-screen font-sans overflow-x-hidden"
+            className="min-h-screen font-sans w-full overflow-hidden"
             style={{ backgroundColor: C.bg, color: 'white', direction: 'rtl' }}
         >
             {/* ── BACKGROUND ELEMENTS ── */}
@@ -422,7 +422,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
 
                 {/* Dashboard preview card */}
                 <div
-                    className="hidden lg:block absolute left-6 top-1/2 -translate-y-1/2 w-[420px] rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
+                    className="hidden lg:block absolute left-6 top-1/2 -translate-y-1/2 w-[420px] rounded-2xl overflow-hidden border border-white/10 shadow-2xl max-w-full"
                     style={{ backgroundColor: C.surface }}
                 >
                     {/* Mock header */}
@@ -444,7 +444,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                                 <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: C.muted }}>
                                     {kpi.label}
                                 </p>
-                                <p className="text-lg font-black" style={{ color: kpi.color }}>{kpi.value}</p>
+                                <p className="text-lg font-black break-words" style={{ color: kpi.color }}>{kpi.value}</p>
                             </div>
                         ))}
                     </div>
@@ -456,14 +456,14 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                             { supplier: 'ברנר שתייה', cat: 'שתייה', total: '₪1,120' },
                         ].map((row) => (
                             <div key={row.supplier} className="flex items-center justify-between text-xs bg-white/5 rounded-lg px-3 py-2">
-                                <span className="font-bold text-white">{row.supplier}</span>
+                                <span className="font-bold text-white truncate max-w-[40%]">{row.supplier}</span>
                                 <span
-                                    className="px-2 py-0.5 rounded"
+                                    className="px-2 py-0.5 rounded shrink-0"
                                     style={{ backgroundColor: C.surface, color: C.muted }}
                                 >
                                     {row.cat}
                                 </span>
-                                <span className="font-black" style={{ color: C.primary }}>{row.total}</span>
+                                <span className="font-black shrink-0" style={{ color: C.primary }}>{row.total}</span>
                             </div>
                         ))}
                     </div>
@@ -658,8 +658,8 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                     style={{ background: `linear-gradient(135deg, ${C.primary}18, ${C.secondary}10)` }}
                 >
                     <GlowOrb className="top-0 right-0 w-64 h-64 opacity-30" style={{ background: C.primary }} />
-                    <GlowOrb className="bottom-0 left-0 w-64 h-64 opacity-20" style={{ background: C.secondary }} />
-                    <div className="relative z-10">
+                    <GlowOrb className="bottom-0 left-0 w-64 h-64 opacity-20 pointer-events-none" style={{ background: C.secondary }} />
+                    <div className="relative z-10 w-full overflow-hidden">
                         <h2 className="text-4xl md:text-5xl font-black mb-4">
                             מוכן לשלוט בעלויות?
                         </h2>
