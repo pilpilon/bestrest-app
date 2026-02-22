@@ -52,7 +52,7 @@ CRITICAL INSTRUCTIONS TO PREVENT USER CONFUSION & ENSURE ACCURACY:
 2. If the user paid a large amount (e.g. 190) for an item with a bulk package name (e.g. "טבעות בצל (10 ק"ג)") with unit "יח'", it means they paid 190 for the ENTIRE 10kg box (which is 19 per kg).
 3. You MUST return the market average for that EXACT same package size! Do not return the price per 1kg if the package is 10kg.
 4. Provide a 'recommendedUnit' string to display to the user so it makes sense (e.g., "למארז 10 ק״ג" or "לקרטון" instead of "ליח'"). This is very important.
-5. WHOLESALE B2B PRICING ONLY: The user is a restaurant owner buying from wholesale distributors. Your market price MUST reflect wholesale rates (e.g., cash & carry, Tnuva, major distributors), which are strictly cheaper than retail supermarket prices. For example, if a 10kg box of frozen onion rings costs 200-280 retail, the true B2B wholesale average should be around 170-190. Calculate accordingly!
+5. WHOLESALE B2B PRICING ONLY: The user is a restaurant owner buying from wholesale distributors. Your market price MUST reflect professional wholesale/institutional rates (e.g., major distributors, food service suppliers, cash & carry). Do not use retail supermarket prices. Estimate the current objective wholesale average in Israel based on your extensive knowledge of the local food service industry.
 
 Input JSON:
 ${JSON.stringify(items, null, 2)}
