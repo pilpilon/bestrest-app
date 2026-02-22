@@ -316,12 +316,6 @@ function Dashboard() {
   }, [expenses]);
 
   const handleExport = () => {
-    if (subscriptionTier === 'free') {
-      setUpgradeFeature('ייצוא נתונים מלא לרואה חשבון');
-      setShowUpgradeModal(true);
-      return;
-    }
-
     if (filteredExpenses.length === 0) {
       setNotification({ type: 'error', message: 'אין נתונים לייצוא' });
       return;

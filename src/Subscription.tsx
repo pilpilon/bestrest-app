@@ -75,8 +75,8 @@ export function Subscription() {
                             <X className="w-5 h-5 shrink-0" />
                             <span>התראות אוטומטיות על התייקרות מחירים</span>
                         </li>
-                        <li className="flex items-center gap-3 text-sm text-[var(--color-text-muted)]">
-                            <X className="w-5 h-5 shrink-0" />
+                        <li className="flex items-center gap-3 text-sm">
+                            <Check className="w-5 h-5 text-[var(--color-primary)] shrink-0" />
                             <span>ייצוא לאקסל ולרואה החשבון</span>
                         </li>
                     </ul>
