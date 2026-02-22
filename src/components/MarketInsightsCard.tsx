@@ -37,25 +37,29 @@ export function MarketInsightsCard({ insights, subscriptionTier, onRequireUpgrad
             <div className="relative p-4 md:p-5">
 
                 {/* PAYWALL BLUR OVERLAY FOR FREE TIER */}
-                {isFree && hasData && (
+                {isFree && (
                     <div className="absolute inset-0 z-10 backdrop-blur-md bg-black/60 flex flex-col items-center justify-center p-6 text-center cursor-pointer transition-colors hover:bg-black/70" onClick={onRequireUpgrade}>
                         <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-3">
                             <Lock className="w-5 h-5 text-white/80" />
                         </div>
                         <h4 className="text-sm font-bold text-white mb-2">
-                            זיהינו שאתה משלם {insights[0].savingsPct}% יותר מממוצע השוק
+                            {hasData
+                                ? `זיהינו שאתה משלם ${insights[0].savingsPct}% יותר מממוצע השוק`
+                                : "ניתוח השוואת מחירים (Market AI)"}
                         </h4>
                         <p className="text-xs text-[var(--color-text-muted)] mb-4 max-w-xs">
-                            מערכת ה-AI שלנו מצאה 3 מוצרי חומר גלם יקרים שאתה קונה קבוע מעל מחיר השוק.
+                            {hasData
+                                ? `מערכת ה-AI שלנו מצאה ${insights.length} מוצרי חומר גלם יקרים שאתה קונה קבוע מעל מחיר השוק.`
+                                : "הצטרף למסלול הפרו כדי לקבל תובנות חכמות על מחירי השוק ואיפה אתה יכול לחסוך כסף."}
                         </p>
                         <button className="bg-[var(--color-primary)] text-slate-900 px-6 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 hover:brightness-110 transition-all shadow-[0_0_15px_rgba(13,242,128,0.3)]">
-                            גלה איפה לחסוך <ChevronLeft className="w-4 h-4" />
+                            {hasData ? "גלה איפה לחסוך" : "שדרג לפרו"} <ChevronLeft className="w-4 h-4" />
                         </button>
                     </div>
                 )}
 
                 {/* Content (Blurred if free, clear if pro) */}
-                <div className={`space-y-4 ${(isFree && hasData) ? 'opacity-30 pointer-events-none select-none filter blur-[2px]' : ''}`}>
+                <div className={`space-y-4 ${isFree ? 'opacity-30 pointer-events-none select-none filter blur-[2px]' : ''}`}>
 
                     {!hasData ? (
                         <div className="flex flex-col items-center justify-center py-6 text-center space-y-3">
@@ -64,7 +68,7 @@ export function MarketInsightsCard({ insights, subscriptionTier, onRequireUpgrad
                             </div>
                             <h4 className="font-bold text-white text-sm">המערכת אוספת נתוני שוק</h4>
                             <p className="text-xs text-[var(--color-text-muted)] max-w-xs text-balance">
-                                אנחנו עוקבים אחרי החשבוניות שלך. ברגע שנזהה פריטים יקרים שאתה קונה קבוע (מינימום 3 פריטים), ה-AI יציג כאן הזדמנויות חיסכון המבוססות על נתוני שוק קיימים.
+                                אנחנו עוקבים אחרי החשבוניות שלך. ברגע שנזהה פריטים יקרים שאתה קונה קבוע (מינימום 3 פריטים), ה-AI יציג כאן הזדמנויות חיסכון.
                             </p>
                         </div>
                     ) : (

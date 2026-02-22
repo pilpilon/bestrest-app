@@ -685,28 +685,38 @@ function Dashboard() {
                     <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
                     התפלגות הוצאות
                   </h3>
-                  <div className="flex-1 min-h-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={categoryData}
-                          innerRadius={60}
-                          outerRadius={90}
-                          paddingAngle={5}
-                          dataKey="value"
-                          stroke="none"
-                        >
-                          {categoryData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip
-                          formatter={(value: number | undefined) => `₪${(value || 0).toLocaleString()}`}
-                          contentStyle={{ backgroundColor: '#1E293B', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
-                          itemStyle={{ color: '#fff' }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="flex-1 min-h-0 flex flex-col items-center justify-center">
+                    {expenses.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={categoryData}
+                            innerRadius={60}
+                            outerRadius={90}
+                            paddingAngle={5}
+                            dataKey="value"
+                            stroke="none"
+                          >
+                            {categoryData.map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip
+                            formatter={(value: number | undefined) => `₪${(value || 0).toLocaleString()}`}
+                            contentStyle={{ backgroundColor: '#1E293B', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
+                            itemStyle={{ color: '#fff' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="text-center space-y-2 opacity-50">
+                        <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center bg-white/5 mx-auto mb-2">
+                          <PieChart className="w-6 h-6 text-[var(--color-text-muted)]" />
+                        </div>
+                        <p className="text-xs font-bold">אין נתונים להצגה</p>
+                        <p className="text-[10px]">סרוק חשבונית כדי לראות התפלגות</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -715,20 +725,30 @@ function Dashboard() {
                     <span className="w-2 h-2 rounded-full bg-[var(--color-secondary)]"></span>
                     מגמת הוצאות
                   </h3>
-                  <div className="flex-1 min-h-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={timeData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                        <XAxis dataKey="date" stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(value) => `₪${value}`} width={50} />
-                        <RechartsTooltip
-                          formatter={(value: number | undefined) => `₪${(value || 0).toLocaleString()}`}
-                          cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                          contentStyle={{ backgroundColor: '#1E293B', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
-                        />
-                        <Bar dataKey="total" fill="var(--color-primary)" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                  <div className="flex-1 min-h-0 flex flex-col items-center justify-center">
+                    {expenses.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={timeData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                          <XAxis dataKey="date" stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(value) => `₪${value}`} width={50} />
+                          <RechartsTooltip
+                            formatter={(value: number | undefined) => `₪${(value || 0).toLocaleString()}`}
+                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                            contentStyle={{ backgroundColor: '#1E293B', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
+                          />
+                          <Bar dataKey="total" fill="var(--color-primary)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="text-center space-y-2 opacity-50">
+                        <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center bg-white/5 mx-auto mb-2">
+                          <BarChart className="w-6 h-6 text-[var(--color-text-muted)]" />
+                        </div>
+                        <p className="text-xs font-bold">אין נתונים להצגה</p>
+                        <p className="text-[10px]">סרוק חשבונית כדי לראות מגמות</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>
