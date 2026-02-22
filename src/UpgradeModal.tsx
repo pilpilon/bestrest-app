@@ -1,5 +1,6 @@
-import { X, Sparkles, MessageCircle, Lock } from 'lucide-react';
+import { X, Sparkles, Lock, CreditCard } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { openPaddleCheckout } from './utils/paddle';
 
 interface UpgradeModalProps {
     isOpen: boolean;
@@ -16,18 +17,13 @@ export function UpgradeModal({
     message = "כדי להשתמש בתכונה זו, יש לשדרג את החשבון למסלול ה-Pro ולקבל גישה חופשית לכל כלי ה-AI של BestRest.",
     featureName
 }: UpgradeModalProps) {
-    const { user, businessName } = useAuth();
+    const { user } = useAuth();
 
     if (!isOpen) return null;
 
     const handleUpgradeClick = () => {
-        // WhatsApp upgrade flow
-        const phone = '972500000000'; // Placeholder
-        let text = `היי, אני רוצה לשדרג את BestRest לפרו עבור המסעדה ${businessName || 'שלי'}.`;
-        if (featureName) text += ` אני צריך גישה ל: ${featureName}.`;
-        text += ` (אימייל: ${user?.email})`;
-
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+        openPaddleCheckout('pri_01kj272mce47gnpstjmgzed3m5', user?.email || undefined, user?.uid);
+        onClose();
     };
 
     return (
@@ -89,7 +85,7 @@ export function UpgradeModal({
                             onClick={handleUpgradeClick}
                             className="w-full bg-[var(--color-primary)] hover:brightness-110 text-slate-900 font-black py-3 rounded-xl flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(13,242,128,0.4)] transition-all active:scale-95"
                         >
-                            <MessageCircle className="w-5 h-5" />
+                            <CreditCard className="w-5 h-5" />
                             שדרג לפרו — 299₪
                         </button>
                         <button

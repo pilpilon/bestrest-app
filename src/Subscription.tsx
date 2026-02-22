@@ -1,15 +1,9 @@
-import { Check, X, CreditCard, Sparkles, MessageCircle, AlertCircle } from 'lucide-react';
+import { Check, X, CreditCard, Sparkles, AlertCircle, Lock } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { openPaddleCheckout } from './utils/paddle';
 
 export function Subscription() {
-    const { user, businessName, subscriptionTier, ocrScansThisMonth } = useAuth();
-
-    const handleUpgradeClick = () => {
-        // WhatsApp upgrade flow (MVP logic)
-        const phone = '972500000000'; // Placeholder - will be requested from user
-        const text = `היי, אני רוצה לשדרג את BestRest לפרו עבור המסעדה ${businessName || 'שלי'}. אימייל מחובר: ${user?.email}`;
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
-    };
+    const { user, subscriptionTier, ocrScansThisMonth } = useAuth();
 
     const isFree = subscriptionTier === 'free';
     const scansRemaining = Math.max(0, 5 - ocrScansThisMonth);
@@ -135,11 +129,11 @@ export function Subscription() {
 
                     {isFree ? (
                         <button
-                            onClick={handleUpgradeClick}
+                            onClick={() => openPaddleCheckout('pri_01kj272mce47gnpstjmgzed3m5', user?.email || undefined, user?.uid)}
                             className="w-full bg-[var(--color-primary)] hover:brightness-110 text-slate-900 font-black py-4 rounded-xl flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(13,242,128,0.4)] transition-all transform hover:scale-[1.02] active:scale-95"
                         >
-                            <MessageCircle className="w-5 h-5" />
-                            שדרג עכשיו בוואטסאפ
+                            <CreditCard className="w-5 h-5" />
+                            תשלום מאובטח ב-Paddle
                         </button>
                     ) : (
                         <div className="w-full bg-white/5 border border-white/10 text-[var(--color-primary)] font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-default">
@@ -149,8 +143,8 @@ export function Subscription() {
                     )}
 
                     <p className="text-[10px] text-center text-[var(--color-text-muted)] mt-4 flex items-center justify-center gap-1">
-                        <CreditCard className="w-3 h-3" />
-                        בקרוב: תשלום אוטומטי באשראי (Paddle)
+                        <Lock className="w-3 h-3" />
+                        התשלום מבוצע בצורה מוצפנת ומאובטחת דרך Paddle, חיוב אוטומטי.
                     </p>
                 </div>
             </div>

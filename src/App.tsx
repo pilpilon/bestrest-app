@@ -9,6 +9,7 @@ import { UpgradeModal } from './UpgradeModal';
 import { LandingPage } from './LandingPage';
 import { useRef, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { initializePaddle } from './utils/paddle';
 
 // Firebase Storage import removed — uploads now go directly to OCR API as base64
 import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
@@ -46,6 +47,10 @@ function Dashboard() {
   // New Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('הכל');
+
+  useEffect(() => {
+    initializePaddle();
+  }, []);
 
   useEffect(() => {
     if (!user || !businessId) return;
