@@ -13,6 +13,8 @@ import { initializePaddle } from './utils/paddle';
 import { generateMarketInsights } from './utils/marketInsights';
 import type { MarketInsight } from './utils/marketInsights';
 import { MarketInsightsCard } from './components/MarketInsightsCard';
+import { useScanQueue } from './hooks/useScanQueue';
+import { ScanQueuePanel } from './components/ScanQueuePanel';
 
 // Firebase Storage import removed — uploads now go directly to OCR API as base64
 import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
@@ -21,13 +23,16 @@ import { db } from './firebase';
 function Dashboard() {
   const { user, role, businessId, businessName, logout, subscriptionTier, ocrScansToday, incrementOcrScan } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  /* uploadProgress state removed */
 
   const [ocrResult, setOcrResult] = useState<any>(null);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewingJobId, setReviewingJobId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loadingExpenses, setLoadingExpenses] = useState(true);
+
+  const { queueJobs, addJob, markReady, markError, removeJob } = useScanQueue(businessId || undefined);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [selectedExpenseForPreview, setSelectedExpenseForPreview] = useState<any | null>(null);
 
@@ -94,7 +99,6 @@ function Dashboard() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // First check Paywall Gate for OCR Scan
     if (subscriptionTier === 'free' && (ocrScansToday || 0) >= 1) {
       setUpgradeFeature('סריקת חשבונית וקריאת נתונים עם AI');
       setShowUpgradeModal(true);
@@ -102,14 +106,11 @@ function Dashboard() {
       return;
     }
 
-    // Show 0% progress while encoding
-    setUploadProgress(0);
-
-    let base64Image = '';
+    const jobId = Math.random().toString(36).substring(7);
+    const fileName = file.name;
 
     try {
-      // Read file as base64 and compress via Canvas to avoid Next.js payload limits
-      const base64 = await new Promise<string>((resolve, reject) => {
+      const base64DataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (event) => {
           const img = new Image();
@@ -117,8 +118,6 @@ function Dashboard() {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-
-            // Shrink massive camera photos
             const MAX_DIMENSION = 1600;
             if (width > height && width > MAX_DIMENSION) {
               height *= MAX_DIMENSION / width;
@@ -127,21 +126,12 @@ function Dashboard() {
               width *= MAX_DIMENSION / height;
               height = MAX_DIMENSION;
             }
-
             canvas.width = width;
             canvas.height = height;
-
             const ctx = canvas.getContext('2d');
             if (!ctx) return reject('No canvas context');
             ctx.drawImage(img, 0, 0, width, height);
-
-            // Compress to JPEG with 0.7 quality
-            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-            base64Image = compressedBase64;
-
-            // Strip data URL prefix to send strictly base64
-            const b64 = compressedBase64.split(',')[1];
-            resolve(b64);
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
           };
           img.onerror = reject;
           if (typeof event.target?.result === 'string') {
@@ -154,53 +144,53 @@ function Dashboard() {
         reader.readAsDataURL(file);
       });
 
-      setUploadProgress(50);
+      // Add to Firestore queue
+      await addJob(jobId, fileName, base64DataUrl);
 
-      const response = await fetch('/api/ocr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: base64,
-          mimeType: file.type || 'image/jpeg',
-        })
-      });
-
-      setUploadProgress(100);
-      const result = await response.json();
-
-      if (result.success) {
-        // Auto-assign category based on history if AI failed or returned 'כללי'
-        let finalCategory = result.data.category;
-        if (finalCategory === "כללי") {
-          const pastExpense = expenses.find(e => e.supplier === result.data.supplier);
-          if (pastExpense) {
-            finalCategory = pastExpense.category;
-          }
-        }
-
-        // Result from /api/ocr (main pipe with pure-code triplet parser)
-        const lineItems = result.data.lineItems || [];
-
-        // Increment scan count in Firestore
-        await incrementOcrScan();
-
-        setOcrResult({
-          ...result.data,
-          category: finalCategory,
-          lineItems,
-          imageUrl: base64Image // Store full base64 data URL
-        });
-        setIsReviewing(true);
-      } else {
-        console.error('OCR API error:', result.error);
-      }
-    } catch (err) {
-      console.error('OCR processing failed:', err);
-      setNotification({ type: 'error', message: 'שגיאה בעיבוד התמונה. נסה שוב או בדוק את גודל הקובץ.' });
-    } finally {
-      setUploadProgress(null);
-      // Reset file input so the same file can be re-selected
+      // Reset input immediately so user can pick next file
       if (fileInputRef.current) fileInputRef.current.value = '';
+
+      // Trigger OCR in background (no await)
+      (async () => {
+        try {
+          const base64 = base64DataUrl.split(',')[1];
+          const response = await fetch('/api/ocr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: base64,
+              mimeType: file.type || 'image/jpeg',
+            })
+          });
+          const result = await response.json();
+
+          if (result.success) {
+            // Auto-assign category
+            let finalCategory = result.data.category;
+            if (finalCategory === "כללי") {
+              const pastExpense = expenses.find(e => e.supplier === result.data.supplier);
+              if (pastExpense) finalCategory = pastExpense.category;
+            }
+
+            await incrementOcrScan();
+
+            await markReady(jobId, {
+              ...result.data,
+              category: finalCategory,
+              imageUrl: base64DataUrl
+            });
+          } else {
+            throw new Error(result.error || 'Unknown error');
+          }
+        } catch (err) {
+          console.error('Background OCR failed:', err);
+          await markError(jobId, 'עיבוד נכשל. נסה שוב.');
+        }
+      })();
+
+    } catch (err) {
+      console.error('File preparation failed:', err);
+      setNotification({ type: 'error', message: 'שגיאה בהכנת הקובץ למשלוח.' });
     }
   };
 
@@ -262,6 +252,10 @@ function Dashboard() {
 
       setIsReviewing(false);
       setOcrResult(null);
+      if (reviewingJobId) {
+        await removeJob(reviewingJobId);
+        setReviewingJobId(null);
+      }
       setNotification({ type: 'success', message: 'החשבונית נשמרה בהצלחה! ✓' });
     } catch (error) {
       console.error("Error saving expense", error);
@@ -510,15 +504,7 @@ function Dashboard() {
         onChange={handleFileUpload}
       />
 
-      {/* Upload Progress Indicator */}
-      {uploadProgress !== null && (
-        <div className="fixed top-0 left-0 w-full h-1 z-[100] bg-white/10">
-          <div
-            className="h-full bg-[var(--color-primary)] transition-all duration-300 shadow-[0_0_10px_var(--color-primary)]"
-            style={{ width: `${uploadProgress}%` }}
-          ></div>
-        </div>
-      )}
+      {/* Upload Progress Indicator removed - replaced by ScanQueuePanel */}
 
       {/* Cyberpunk Background Effect */}
       <div className="fixed inset-0 pointer-events-none opacity-40 bg-[linear-gradient(to_right,rgba(13,242,128,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(13,242,128,0.05)_1px,transparent_1px)] bg-[size:30px_30px]"></div>
@@ -543,16 +529,35 @@ function Dashboard() {
           {role !== 'accountant' && (
             <button
               onClick={triggerUpload}
-              className="bg-[var(--color-primary)] text-[var(--color-background)] py-2 px-3 md:px-4 rounded-lg font-bold text-sm flex items-center gap-2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:brightness-110 transition-all"
+              className="bg-[var(--color-primary)] text-[var(--color-background)] py-2 px-3 md:px-4 rounded-lg font-bold text-sm flex items-center gap-2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:brightness-110 transition-all relative"
             >
               <Plus className="w-5 h-5 hidden md:block" />
               <Plus className="w-5 h-5 md:hidden" />
               <span className="hidden md:inline">הוסף חשבונית</span>
+
+              {/* Ready to review badge */}
+              {queueJobs.filter(j => j.status === 'ready').length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-[var(--color-background)] animate-bounce">
+                  {queueJobs.filter(j => j.status === 'ready').length}
+                </span>
+              )}
             </button>
           )}
         </header>
 
         <main className="flex-1 p-4 pb-24 space-y-6 max-w-7xl mx-auto w-full">
+          {currentView === 'dashboard' && (
+            <ScanQueuePanel
+              jobs={queueJobs}
+              onRemove={removeJob}
+              onReview={(job) => {
+                setOcrResult(job.ocrResult);
+                setReviewingJobId(job.id);
+                setIsReviewing(true);
+              }}
+            />
+          )}
+
           {currentView === 'dashboard' ? (
             <>
               {/* KPI Cards Section */}
