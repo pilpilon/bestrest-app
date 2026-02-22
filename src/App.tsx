@@ -205,6 +205,11 @@ function Dashboard() {
   };
 
   const triggerUpload = () => {
+    if (subscriptionTier === 'free' && (ocrScansToday || 0) >= 1) {
+      setUpgradeFeature('סריקת חשבונית וקריאת נתונים עם AI');
+      setShowUpgradeModal(true);
+      return;
+    }
     fileInputRef.current?.click();
   };
 
