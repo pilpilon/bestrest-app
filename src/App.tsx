@@ -10,6 +10,9 @@ import { LandingPage } from './LandingPage';
 import { useRef, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { initializePaddle } from './utils/paddle';
+import { generateMarketInsights } from './utils/marketInsights';
+import type { MarketInsight } from './utils/marketInsights';
+import { MarketInsightsCard } from './components/MarketInsightsCard';
 
 // Firebase Storage import removed — uploads now go directly to OCR API as base64
 import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
@@ -259,12 +262,20 @@ function Dashboard() {
     return matchesSearch && matchesCategory;
   });
 
+  const [marketInsightsData, setMarketInsightsData] = useState<MarketInsight[]>([]);
+
   useEffect(() => {
     if (notification) {
       const timer = setTimeout(() => setNotification(null), 5000);
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  // Generate market insights whenever expenses change
+  useEffect(() => {
+    const insights = generateMarketInsights(expenses);
+    setMarketInsightsData(insights);
+  }, [expenses]);
 
   const handleExport = () => {
     if (subscriptionTier === 'free') {
@@ -618,6 +629,20 @@ function Dashboard() {
                 </div>
               </section>
 
+              {/* Market Insights AI Card */}
+              {marketInsightsData.length > 0 && (
+                <section>
+                  <MarketInsightsCard
+                    insights={marketInsightsData}
+                    subscriptionTier={subscriptionTier as 'free' | 'pro'}
+                    onRequireUpgrade={() => {
+                      setUpgradeFeature('תובנות חכמות השוואת מחירים (Market AI)');
+                      setShowUpgradeModal(true);
+                    }}
+                  />
+                </section>
+              )}
+
               {/* Analytics Charts Section */}
               <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl h-80 flex flex-col">
@@ -810,13 +835,17 @@ function Dashboard() {
                 setUpgradeFeature(feature);
                 setShowUpgradeModal(true);
               }}
+              onNavigate={setCurrentView}
+              onLogout={logout}
             />
           )}
         </main>
 
         {/* Bottom Navigation Bar */}
         <nav className="fixed bottom-0 inset-x-0 bg-white/5 backdrop-blur-md border-t border-white/10 px-6 py-3 z-50 rounded-t-2xl">
-          <div className="flex items-center justify-between max-w-md mx-auto relative">
+          <div className="flex items-center justify-between max-w-md mx-auto relative" dir="rtl">
+
+            {/* 1. Dashboard (Far Right in RTL) */}
             <button
               onClick={() => setCurrentView('dashboard')}
               className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'dashboard' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
@@ -824,6 +853,8 @@ function Dashboard() {
               <LayoutDashboard className="w-6 h-6" />
               <span className="text-[10px] font-bold">דשבורד</span>
             </button>
+
+            {/* 2. Cookbook */}
             <button
               onClick={() => setCurrentView('cookbook')}
               className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'cookbook' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
@@ -832,35 +863,27 @@ function Dashboard() {
               <span className="text-[10px] font-medium">מתכונים</span>
             </button>
 
-            {role !== 'accountant' && (
+            {/* 3. CENTER FLOATING BUTTON (Add Invoice) */}
+            {role !== 'accountant' ? (
               <button
                 onClick={triggerUpload}
-                className="bg-[var(--color-primary)] text-slate-900 p-3 rounded-full absolute -top-10 left-1/2 -translate-x-1/2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:scale-110 transition-transform active:scale-95"
+                className="bg-[var(--color-primary)] text-slate-900 p-3 rounded-full absolute -top-10 left-1/2 -translate-x-1/2 shadow-[0_0_15px_rgba(13,242,128,0.4)] hover:scale-110 transition-transform active:scale-95 z-50"
               >
                 <Plus className="w-6 h-6" />
               </button>
+            ) : (
+              <div className="w-12 h-12"></div> /* spacing placeholder if no button */
             )}
 
+            {/* 4. Settings (Far Left in RTL) */}
             <button
               onClick={() => setCurrentView('users')}
-              className={`flex flex-col items-center gap-1 transition-colors ml-4 ${currentView === 'users' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+              className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'users' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
             >
               <Settings className="w-6 h-6" />
               <span className="text-[10px] font-medium">{role === 'admin' ? 'הגדרות' : 'משתמשים'}</span>
             </button>
 
-            <button
-              onClick={() => setCurrentView('subscription')}
-              className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'subscription' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
-            >
-              <CreditCard className="w-6 h-6" />
-              <span className="text-[10px] font-medium">מנוי</span>
-            </button>
-
-            <button onClick={logout} className="flex flex-col items-center gap-1 text-[var(--color-text-muted)]">
-              <LogOut className="w-6 h-6" />
-              <span className="text-[10px] font-medium">התנתק</span>
-            </button>
           </div>
         </nav>
 
@@ -1066,7 +1089,7 @@ function ReportPreviewModal({
   );
 }
 
-function UsersManagement({ onNotify, onRequireUpgrade }: { onNotify: (n: { type: 'success' | 'error', message: string }) => void, onRequireUpgrade: (feature: string) => void }) {
+function UsersManagement({ onNotify, onRequireUpgrade, onNavigate, onLogout }: { onNotify: (n: { type: 'success' | 'error', message: string }) => void, onRequireUpgrade: (feature: string) => void, onNavigate: (view: 'dashboard' | 'cookbook' | 'users' | 'subscription') => void, onLogout: () => void }) {
   const { role, businessId, subscriptionTier } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1187,6 +1210,30 @@ function UsersManagement({ onNotify, onRequireUpgrade }: { onNotify: (n: { type:
               {emailSaved ? '✓ נשמר' : savingEmail ? '...' : 'שמור'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Account Actions Section */}
+      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+        <h3 className="text-base font-bold flex items-center gap-2">
+          <CreditCard className="w-5 h-5 text-[var(--color-primary)]" />
+          ניהול חשבון ומנוי
+        </h3>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => onNavigate('subscription')}
+            className="flex-1 bg-white/10 hover:bg-white/15 border border-[var(--color-primary)]/30 text-white px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
+          >
+            <CreditCard className="w-4 h-4 text-[var(--color-primary)]" />
+            נהל מנוי {subscriptionTier === 'pro' ? 'פעיל' : ''}
+          </button>
+          <button
+            onClick={onLogout}
+            className="flex-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            התנתק מהמערכת
+          </button>
         </div>
       </div>
 
