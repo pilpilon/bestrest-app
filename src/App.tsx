@@ -1,4 +1,4 @@
-import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2, CreditCard, Lock, Send } from 'lucide-react';
+import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2, CreditCard, Lock, Send, BarChart3 } from 'lucide-react';
 import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Login } from './Login';
@@ -7,6 +7,7 @@ import { Cookbook } from './Cookbook';
 import { Subscription } from './Subscription';
 import { UpgradeModal } from './UpgradeModal';
 import { LandingPage } from './LandingPage';
+import { Reports } from './Reports';
 import { useRef, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { initializePaddle } from './utils/paddle';
@@ -43,7 +44,8 @@ function Dashboard() {
   const [accountantEmail, setAccountantEmail] = useState<string>('');
 
   // View State
-  const [currentView, setCurrentView] = useState<'dashboard' | 'cookbook' | 'users' | 'subscription'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'cookbook' | 'users' | 'subscription' | 'reports'>('dashboard');
+  const [reportsSection, setReportsSection] = useState<'expenses' | 'suppliers' | null>(null);
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportPreview, setShowReportPreview] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
@@ -592,7 +594,10 @@ function Dashboard() {
               {/* KPI Cards Section */}
               <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {/* Card 1: Monthly Total */}
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative overflow-hidden group">
+                <div
+                  className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative overflow-hidden group cursor-pointer hover:bg-white/10 transition-colors"
+                  onClick={() => { setCurrentView('reports'); setReportsSection('expenses'); }}
+                >
                   <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-primary)]"></div>
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">הוצאות החודש</p>
                   <h3 className="text-2xl font-black">₪{monthlyTotal.toLocaleString()}</h3>
@@ -634,7 +639,10 @@ function Dashboard() {
                 </div>
 
                 {/* Card 3: Top Supplier (real data) */}
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl">
+                <div
+                  className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl cursor-pointer hover:bg-white/10 transition-colors"
+                  onClick={() => { setCurrentView('reports'); setReportsSection('suppliers'); }}
+                >
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">ספק מוביל</p>
                   {topSupplier ? (
                     <>
@@ -911,6 +919,8 @@ function Dashboard() {
             </>
           ) : currentView === 'cookbook' ? (
             <Cookbook />
+          ) : currentView === 'reports' ? (
+            <Reports expenses={expenses} initialSection={reportsSection} />
           ) : currentView === 'subscription' ? (
             <Subscription />
           ) : (
@@ -937,6 +947,15 @@ function Dashboard() {
             >
               <LayoutDashboard className="w-6 h-6" />
               <span className="text-[10px] font-bold">דשבורד</span>
+            </button>
+
+            {/* Reports */}
+            <button
+              onClick={() => { setCurrentView('reports'); setReportsSection(null); }}
+              className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'reports' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+            >
+              <BarChart3 className="w-6 h-6" />
+              <span className="text-[10px] font-bold">דוחות</span>
             </button>
 
             {/* 2. Cookbook */}
