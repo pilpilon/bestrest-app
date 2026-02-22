@@ -19,7 +19,7 @@ import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot,
 import { db } from './firebase';
 
 function Dashboard() {
-  const { user, role, businessId, businessName, logout, subscriptionTier, ocrScansThisMonth, incrementOcrScan } = useAuth();
+  const { user, role, businessId, businessName, logout, subscriptionTier, ocrScansToday, incrementOcrScan } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
@@ -95,7 +95,7 @@ function Dashboard() {
     if (!file || !user) return;
 
     // First check Paywall Gate for OCR Scan
-    if (subscriptionTier === 'free' && (ocrScansThisMonth || 0) >= 5) {
+    if (subscriptionTier === 'free' && (ocrScansToday || 0) >= 1) {
       setUpgradeFeature('סריקת חשבונית וקריאת נתונים עם AI');
       setShowUpgradeModal(true);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -108,15 +108,47 @@ function Dashboard() {
     let base64Image = '';
 
     try {
-      // Read file as base64 and send directly to OCR API — no CORS issues
+      // Read file as base64 and compress via Canvas to avoid Next.js payload limits
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          // Strip the data URL prefix (e.g. "data:image/jpeg;base64,")
-          const b64 = result.split(',')[1];
-          base64Image = result; // Keep full data URL for display
-          resolve(b64);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            // Shrink massive camera photos
+            const MAX_DIMENSION = 1600;
+            if (width > height && width > MAX_DIMENSION) {
+              height *= MAX_DIMENSION / width;
+              width = MAX_DIMENSION;
+            } else if (height > MAX_DIMENSION) {
+              width *= MAX_DIMENSION / height;
+              height = MAX_DIMENSION;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return reject('No canvas context');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Compress to JPEG with 0.7 quality
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            base64Image = compressedBase64;
+
+            // Strip data URL prefix to send strictly base64
+            const b64 = compressedBase64.split(',')[1];
+            resolve(b64);
+          };
+          img.onerror = reject;
+          if (typeof event.target?.result === 'string') {
+            img.src = event.target.result;
+          } else {
+            reject('Failed to read file');
+          }
         };
         reader.onerror = reject;
         reader.readAsDataURL(file);
@@ -164,6 +196,7 @@ function Dashboard() {
       }
     } catch (err) {
       console.error('OCR processing failed:', err);
+      setNotification({ type: 'error', message: 'שגיאה בעיבוד התמונה. נסה שוב או בדוק את גודל הקובץ.' });
     } finally {
       setUploadProgress(null);
       // Reset file input so the same file can be re-selected

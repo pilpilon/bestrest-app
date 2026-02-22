@@ -10,7 +10,7 @@ interface AuthContextType {
     businessId: string | null;
     businessName: string | null;
     subscriptionTier: 'free' | 'pro';
-    ocrScansThisMonth: number;
+    ocrScansToday: number;
     completedOnboarding: boolean;
     loading: boolean;
     signInWithGoogle: () => Promise<void>;
@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [businessId, setBusinessId] = useState<string | null>(null);
     const [businessName, setBusinessName] = useState<string | null>(null);
     const [subscriptionTier, setSubscriptionTier] = useState<'free' | 'pro'>('free');
-    const [ocrScansThisMonth, setOcrScansThisMonth] = useState<number>(0);
+    const [ocrScansToday, setOcrScansToday] = useState<number>(0);
     const [completedOnboarding, setCompletedOnboarding] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -61,19 +61,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             const tier = data.subscriptionTier || 'free';
                             setSubscriptionTier(tier);
 
-                            // Check if a new month started and we need to reset the counter
+                            // Check if a new day started and we need to reset the counter
                             const now = new Date();
-                            const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`;
+                            const currentDate = `${now.getFullYear()}-${Math.floor(now.getMonth() + 1).toString().padStart(2, '0')}-${Math.floor(now.getDate()).toString().padStart(2, '0')}`;
 
-                            if (data.ocrScanResetDate !== currentMonth && tier === 'free') {
-                                // Reset scan count for the new month
+                            if (data.ocrScanResetDate !== currentDate && tier === 'free') {
+                                // Reset scan count for the new day
                                 await setDoc(userDocRef, {
-                                    ocrScansThisMonth: 0,
-                                    ocrScanResetDate: currentMonth
+                                    ocrScansToday: 0,
+                                    ocrScanResetDate: currentDate
                                 }, { merge: true });
-                                setOcrScansThisMonth(0);
+                                setOcrScansToday(0);
                             } else {
-                                setOcrScansThisMonth(data.ocrScansThisMonth || 0);
+                                setOcrScansToday(data.ocrScansToday || 0);
                             }
 
                             setCompletedOnboarding(data.completedOnboarding ?? !!data.businessName);
@@ -103,12 +103,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             setRole(newRole);
                             setBusinessId(newBusinessId);
                             setSubscriptionTier('free');
-                            setOcrScansThisMonth(0);
+                            setOcrScansToday(0);
                             setCompletedOnboarding(false);
                             setLoading(false);
 
                             const now = new Date();
-                            const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`;
+                            const currentDate = `${now.getFullYear()}-${Math.floor(now.getMonth() + 1).toString().padStart(2, '0')}-${Math.floor(now.getDate()).toString().padStart(2, '0')}`;
 
                             // Create initial profile document
                             setDoc(userDocRef, {
@@ -119,8 +119,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 role: newRole,
                                 businessId: newBusinessId,
                                 subscriptionTier: 'free',
-                                ocrScansThisMonth: 0,
-                                ocrScanResetDate: currentMonth,
+                                ocrScansToday: 0,
+                                ocrScanResetDate: currentDate,
                                 completedOnboarding: false,
                                 createdAt: now.toISOString()
                             }, { merge: true }).catch(e => console.error("Failed to persist initial user profile:", e));
@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setBusinessId(null);
                     setBusinessName(null);
                     setSubscriptionTier('free');
-                    setOcrScansThisMonth(0);
+                    setOcrScansToday(0);
                     setCompletedOnboarding(false);
                     setLoading(false);
                 }
@@ -171,12 +171,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const incrementOcrScan = async () => {
         if (!user) return false;
         try {
-            if (subscriptionTier === 'free' && ocrScansThisMonth >= 5) {
+            if (subscriptionTier === 'free' && ocrScansToday >= 1) {
                 return false; // Deny if at limit
             }
             const userDocRef = doc(db, 'users', user.uid);
             await setDoc(userDocRef, {
-                ocrScansThisMonth: ocrScansThisMonth + 1
+                ocrScansToday: ocrScansToday + 1
             }, { merge: true });
             return true;
         } catch (err) {
@@ -191,7 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         businessId,
         businessName,
         subscriptionTier,
-        ocrScansThisMonth,
+        ocrScansToday,
         completedOnboarding,
         loading,
         signInWithGoogle,

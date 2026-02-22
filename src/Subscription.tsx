@@ -3,12 +3,12 @@ import { useAuth } from './AuthContext';
 import { openPaddleCheckout } from './utils/paddle';
 
 export function Subscription() {
-    const { user, subscriptionTier, ocrScansThisMonth } = useAuth();
+    const { user, subscriptionTier, ocrScansToday } = useAuth();
 
     const isFree = subscriptionTier === 'free';
-    const scansRemaining = Math.max(0, 5 - ocrScansThisMonth);
-    const scanPercentage = Math.min(100, (ocrScansThisMonth / 5) * 100);
-    const isDangerZone = isFree && ocrScansThisMonth >= 4;
+    const scansRemaining = Math.max(0, 1 - (ocrScansToday || 0));
+    const scanPercentage = Math.min(100, ((ocrScansToday || 0) / 1) * 100);
+    const isDangerZone = isFree && (ocrScansToday || 0) >= 1;
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
@@ -50,16 +50,16 @@ export function Subscription() {
                         <li className="flex items-start gap-3 text-sm">
                             <AlertCircle className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
                             <div>
-                                <strong>סריקת 5 חשבוניות בחודש (AI)</strong>
+                                <strong>סריקת חשבונית 1 ביום (AI)</strong>
 
                                 {/* Usage Meter */}
                                 {isFree && (
                                     <div className="mt-3 bg-black/20 rounded-xl p-3 border border-white/5">
                                         <div className="flex justify-between text-[10px] font-bold mb-1.5">
                                             <span className={isDangerZone ? 'text-red-400' : 'text-[var(--color-text-muted)]'}>
-                                                {ocrScansThisMonth} נוצלו
+                                                {ocrScansToday || 0} נוצלו
                                             </span>
-                                            <span className="text-[var(--color-primary)]">{scansRemaining} נותרו</span>
+                                            <span className="text-[var(--color-primary)]">{scansRemaining} נותרו להיום</span>
                                         </div>
                                         <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
                                             <div
