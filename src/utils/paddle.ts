@@ -1,7 +1,7 @@
 // Paddle Payment Integration Utility
 
 // Paddle Client-side Token from Dashboard > Developer Tools > Authentication
-export const PADDLE_CLIENT_TOKEN = "live_3bf3c6931cb5e4af8f0b7300c6a";
+export const PADDLE_CLIENT_TOKEN = import.meta.env.VITE_PADDLE_CLIENT_TOKEN || "live_3bf3c6931cb5e4af8f0b7300c6a";
 
 // Initialize Paddle (v2)
 export const initializePaddle = () => {
