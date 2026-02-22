@@ -53,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>דוח הוצאות BestRest</title>
+  <title>BestRest - חשבוניות שנשלחו</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #0b1120; font-family: 'Helvetica Neue', Arial, sans-serif;">
   
@@ -69,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 <span style="color: #0df280; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;">BestRest</span>
               </div>
               <h1 style="color: #f1f5f9; font-size: 24px; font-weight: 800; margin: 0 0 8px 0;">
-                דוח הוצאות חודשי
+                חשבוניות שנשלחו
               </h1>
               <p style="color: #64748b; font-size: 15px; margin: 0;">
                 ${businessName || 'מסעדה'} — ${monthYear}
@@ -177,7 +177,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: [accountantEmail],
       replyTo: userEmail, // Accountant can reply directly to the restaurant owner
-      subject: `📊 דוח הוצאות — ${businessName || 'מסעדה'} — ${monthYear}`,
+      subject: `📊 חשבוניות שנשלחו — ${businessName || 'מסעדה'} — ${monthYear}`,
       html: htmlContent,
       attachments: attachments.length > 0 ? attachments : undefined,
     });
