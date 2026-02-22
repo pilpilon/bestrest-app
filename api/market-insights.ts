@@ -45,19 +45,22 @@ You are an expert economic consultant for the restaurant and hospitality industr
 You possess deep knowledge of current wholesale B2B pricing, food costs, and supplier rates in NIS (Shekels).
 
 The user is providing you with a JSON array of ingredients they recently purchased, including the name they used, the price they paid per unit, and the unit type.
-Your task is to analyze each item and provide a realistic, objective "Market Average" wholesale price for it in Israel today, taking into account the unit specified.
+Your task is to analyze each item and provide a realistic, objective "Market Average" wholesale price for it in Israel today.
+
+CRITICAL INSTRUCTIONS TO PREVENT USER CONFUSION:
+1. Pay close attention to package sizes in the item name (e.g., "10 ק"ג", "5 ליטר", "קרטון").
+2. If the user paid a large amount (e.g. 190) for an item with a bulk package name (e.g. "טבעות בצל (10 ק"ג)") with unit "יח'", it means they paid 190 for the ENTIRE 10kg box (which is 19 per kg).
+3. You MUST return the market average for that EXACT same package size! (e.g., return 180 for the whole 10kg box).
+4. Provide a 'recommendedUnit' string to display to the user so it makes sense (e.g., "למארז 10 ק״ג" or "לקרטון" instead of "ליח'"). This is very important.
 
 Input JSON:
 ${JSON.stringify(items, null, 2)}
 
-Instructions:
-1. For each item in the input array, give your best estimate for the "marketPrice" (number) in NIS based on standard Israeli restaurant supplier rates.
-2. If the user's price is extremely high or unusual, ignore it and provide the true market average. If the item is too vague, give a generalized average for that category.
-3. Return ONLY a JSON array of objects. 
-4. Each object MUST have the following structure exactly:
+Return ONLY a JSON array of objects. Each object MUST have the following structure exactly:
 {
   "itemName": "string (the exact name from the input)",
-  "marketPrice": number (your estimated market average in NIS)
+  "marketPrice": number (your estimated market average in NIS for the package),
+  "recommendedUnit": "string (a readable unit like 'למארז 10 ק״ג' based on the name)"
 }
 No other text, no markdown formatting outside the JSON array. Return exactly an array of objects.
 `;
@@ -84,9 +87,16 @@ No other text, no markdown formatting outside the JSON array. Return exactly an 
             if (inputItem.price > marketPrice && marketPrice > 0) {
                 savingsPct = ((inputItem.price - marketPrice) / inputItem.price) * 100;
             } else if (marketPrice > inputItem.price) {
-                // If the user's price is *better* than the market average, the savings potential is 0 regarding "buying at market".
-                // They are already beating the market.
                 savingsPct = 0;
+            }
+
+            // Clean up the recommended unit if it starts with "ל" already, to avoid "ללמארז" 
+            let finalUnit = inputItem.unit || 'יח\'';
+            if (geminiEst && geminiEst.recommendedUnit) {
+                finalUnit = geminiEst.recommendedUnit.toString().trim();
+                if (finalUnit.startsWith('ל')) {
+                    finalUnit = finalUnit.substring(1);
+                }
             }
 
             return {
@@ -94,7 +104,7 @@ No other text, no markdown formatting outside the JSON array. Return exactly an 
                 userPrice: inputItem.price,
                 marketPrice: marketPrice,
                 savingsPct: parseFloat(savingsPct.toFixed(1)),
-                unit: inputItem.unit || 'יח\''
+                unit: finalUnit
             };
         });
 

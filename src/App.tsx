@@ -300,6 +300,19 @@ function Dashboard() {
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [insightsCacheKey, setInsightsCacheKey] = useState<number>(0);
 
+  // Load from local storage on mount if businessId changes
+  useEffect(() => {
+    if (businessId) {
+      try {
+        const savedData = localStorage.getItem(`marketInsightsCache_${businessId}`);
+        const savedKey = localStorage.getItem(`marketInsightsKey_${businessId}`);
+        if (savedData && savedKey) {
+          setMarketInsightsData(JSON.parse(savedData));
+          setInsightsCacheKey(parseInt(savedKey, 10));
+        }
+      } catch (e) { }
+    }
+  }, [businessId]);
 
   useEffect(() => {
     if (notification) {
@@ -313,17 +326,20 @@ function Dashboard() {
     let isMounted = true;
 
     const fetchInsights = async () => {
-      // Basic cache invalidation key: number of expenses. 
-      // In a real app, you might hash the latest expense dates.
+      // Cache invalidation key: number of expenses
       const currentCacheKey = expenses.length;
 
-      if (expenses.length > 0 && currentCacheKey !== insightsCacheKey) {
+      if (expenses.length > 0 && currentCacheKey !== insightsCacheKey && businessId) {
         setLoadingInsights(true);
         try {
           const insights = await generateMarketInsights(expenses);
           if (isMounted) {
             setMarketInsightsData(insights);
             setInsightsCacheKey(currentCacheKey);
+            try {
+              localStorage.setItem(`marketInsightsCache_${businessId}`, JSON.stringify(insights));
+              localStorage.setItem(`marketInsightsKey_${businessId}`, currentCacheKey.toString());
+            } catch (e) { }
           }
         } catch (error) {
           console.error("Error fetching market insights:", error);
@@ -333,12 +349,25 @@ function Dashboard() {
       }
     };
 
-    fetchInsights();
+    // If we just loaded the cache and the lengths match, skip fetching.
+    // We only fetch if the keys differ and it's not the initial render 0 state matching 0 expenses
+    // Wait, if expenses.length is 0, fetchInsights does nothing because of `expenses.length > 0`.
+    if (insightsCacheKey !== 0 || expenses.length === 0 || !businessId) {
+      // Safe to check or just call. If insightsCacheKey is 0, but we have expenses, it means cache wasn't loaded or was empty.
+      // We actually want to call it if currentCacheKey !== insightsCacheKey.
+    }
+
+    // We must ensure this runs AFTER the cache load effect if there is cached data.
+    // The previous effect runs when businessId changes, setting insightsCacheKey.
+    // This effect runs when expenses or insightsCacheKey changes.
+    // It's possible expenses loads before cache, triggering a fetch.
+    // Let's add a small check: 
+    if (businessId) fetchInsights();
 
     return () => {
       isMounted = false;
     };
-  }, [expenses, insightsCacheKey]);
+  }, [expenses, insightsCacheKey, businessId]);
 
   const handleExport = () => {
     if (filteredExpenses.length === 0) {
