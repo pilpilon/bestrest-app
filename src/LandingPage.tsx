@@ -207,12 +207,17 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 // MAIN LANDING PAGE
 // ──────────────────────────────────────────────
 
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
+import { RefundPolicy } from './pages/RefundPolicy';
+
 interface LandingPageProps {
     onLogin: () => void;
 }
 
 export function LandingPage({ onLogin }: LandingPageProps) {
     const [scrolled, setScrolled] = useState(false);
+    const [currentLegalPage, setCurrentLegalPage] = useState<'privacy' | 'terms' | 'refund' | null>(null);
 
     useEffect(() => {
         const handler = () => setScrolled(window.scrollY > 20);
@@ -225,6 +230,10 @@ export function LandingPage({ onLogin }: LandingPageProps) {
         const text = 'היי, אני מעוניין להצטרף ל-BestRest Pro!';
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
     };
+
+    if (currentLegalPage === 'privacy') return <PrivacyPolicy onBack={() => setCurrentLegalPage(null)} />;
+    if (currentLegalPage === 'terms') return <TermsOfService onBack={() => setCurrentLegalPage(null)} />;
+    if (currentLegalPage === 'refund') return <RefundPolicy onBack={() => setCurrentLegalPage(null)} />;
 
     const features = [
         {
@@ -709,9 +718,10 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                     <p className="text-xs" style={{ color: C.muted }}>
                         © {new Date().getFullYear()} BestRest — מנהל המסעדה החכם
                     </p>
-                    <div className="flex items-center gap-6 text-xs" style={{ color: C.muted }}>
-                        <a href="#" className="hover:text-white transition-colors">פרטיות</a>
-                        <a href="#" className="hover:text-white transition-colors">תנאי שימוש</a>
+                    <div className="flex flex-wrap items-center justify-center gap-6 text-xs" style={{ color: C.muted }}>
+                        <button onClick={() => setCurrentLegalPage('privacy')} className="hover:text-white transition-colors">מדיניות פרטיות</button>
+                        <button onClick={() => setCurrentLegalPage('terms')} className="hover:text-white transition-colors">תנאי שימוש</button>
+                        <button onClick={() => setCurrentLegalPage('refund')} className="hover:text-white transition-colors">מדיניות החזרים ותשלומים</button>
                     </div>
                 </div>
             </footer>
