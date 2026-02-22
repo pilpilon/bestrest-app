@@ -60,6 +60,7 @@ function Dashboard() {
   // New Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('הכל');
+  const [expensesDisplayLimit, setExpensesDisplayLimit] = useState(5);
 
   useEffect(() => {
     initializePaddle();
@@ -891,7 +892,7 @@ function Dashboard() {
                     <Receipt className="w-5 h-5 text-[var(--color-primary)]" />
                     חשבוניות {searchQuery || activeCategory !== 'הכל' ? 'מסוננות' : 'אחרונות'}
                   </h3>
-                  <button className="text-[var(--color-primary)] text-sm font-medium hover:underline cursor-pointer">הצג הכל</button>
+                  <span className="text-xs text-[var(--color-text-muted)] bg-white/5 px-2 py-1 rounded-full border border-white/10">{filteredExpenses.length} קבלות</span>
                 </div>
 
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden">
@@ -919,7 +920,7 @@ function Dashboard() {
                             </td>
                           </tr>
                         ) : (
-                          filteredExpenses.map((expense) => (
+                          filteredExpenses.slice(0, expensesDisplayLimit).map((expense) => (
                             <tr
                               key={expense.id}
                               onClick={() => expense.imageUrl && setSelectedExpenseForPreview(expense)}
@@ -970,6 +971,18 @@ function Dashboard() {
                       </tbody>
                     </table>
                   </div>
+                  {/* Show more / collapse */}
+                  {filteredExpenses.length > 5 && (
+                    <button
+                      onClick={() => setExpensesDisplayLimit(prev => prev >= filteredExpenses.length ? 5 : prev + 10)}
+                      className="w-full py-3 text-xs font-bold text-[var(--color-text-muted)] hover:text-white hover:bg-white/5 transition-colors border-t border-white/5"
+                    >
+                      {expensesDisplayLimit >= filteredExpenses.length
+                        ? `הצג פחות ↑`
+                        : `הצג עוד 10 ↓ (${filteredExpenses.length - expensesDisplayLimit} נותרו)`
+                      }
+                    </button>
+                  )}
                 </div>
               </section>
             </>

@@ -137,23 +137,26 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
 
     // 4. Top Items
     const topItems = useMemo(() => {
-        const itemsMap = new Map<string, { quantity: number; amount: number; supplier: string }>();
+        // Use normalized (lowercase trim) name as map key to merge OCR variants of the same item
+        const itemsMapByKey = new Map<string, { displayName: string; quantity: number; amount: number; supplier: string }>();
         filteredExpenses.forEach(exp => {
             if (exp.lineItems) {
                 exp.lineItems.forEach(item => {
                     if (!item.name) return;
-                    const current = itemsMap.get(item.name) || { quantity: 0, amount: 0, supplier: exp.supplier };
-                    itemsMap.set(item.name, {
+                    const key = item.name.trim().toLowerCase();
+                    const current = itemsMapByKey.get(key) || { displayName: item.name.trim(), quantity: 0, amount: 0, supplier: exp.supplier };
+                    itemsMapByKey.set(key, {
+                        displayName: current.displayName, // keep first observed display name
                         quantity: current.quantity + (item.quantity || 1),
                         amount: current.amount + (item.total || (item.pricePerUnit * (item.quantity || 1)) || 0),
-                        supplier: current.supplier // keep first observed supplier
+                        supplier: current.supplier
                     });
                 });
             }
         });
 
-        return Array.from(itemsMap.entries())
-            .map(([name, data]) => ({ name, ...data }))
+        return Array.from(itemsMapByKey.values())
+            .map(({ displayName, quantity, amount, supplier }) => ({ name: displayName, quantity, amount, supplier }))
             .sort((a, b) => b.amount - a.amount)
             .slice(0, 5); // Top 5 items
     }, [filteredExpenses]);
@@ -402,7 +405,7 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
                                             <tr key={idx} className="hover:bg-white/5 transition-colors">
                                                 <td className="p-3 font-medium text-white">{item.name}</td>
                                                 <td className="p-3 text-[var(--color-text-muted)]">{item.supplier || '-'}</td>
-                                                <td className="p-3 text-center text-blue-300 bg-blue-500/10 rounded">{item.quantity}</td>
+                                                <td className="p-3 text-center text-blue-300 bg-blue-500/10 rounded">{parseFloat(item.quantity.toFixed(3))}</td>
                                                 <td className="p-3 font-bold text-[var(--color-primary)]">₪{item.amount.toLocaleString()}</td>
                                             </tr>
                                         )) : (
