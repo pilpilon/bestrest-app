@@ -39,10 +39,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .map(
       (exp: any) => `
     <tr>
-      <td style="padding: 10px 16px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 13px;">${exp.date}</td>
-      <td style="padding: 10px 16px; border-bottom: 1px solid #1e293b; color: #f1f5f9; font-size: 13px; font-weight: 600;">${exp.supplier}</td>
-      <td style="padding: 10px 16px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 13px;">${exp.category}</td>
-      <td style="padding: 10px 16px; border-bottom: 1px solid #1e293b; color: #0df280; font-size: 13px; font-weight: 700; text-align: left;">₪${(exp.total || 0).toLocaleString()}</td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 13px; text-align: right; vertical-align: middle;">${exp.date}</td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #f1f5f9; font-size: 13px; font-weight: 600; text-align: right; vertical-align: middle;">${exp.supplier}</td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 13px; text-align: right; vertical-align: middle;">${exp.category}</td>
+      <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #0df280; font-size: 14px; font-weight: 700; text-align: left; vertical-align: middle; direction: ltr;">₪${(exp.total || 0).toLocaleString()}</td>
     </tr>
   `
     )
@@ -80,18 +80,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           <!-- TOTAL HIGHLIGHT BANNER -->
           <tr>
-            <td style="background: #0df28015; border-right: 1px solid #0df28030; border-left: 1px solid #0df28030; padding: 20px 36px;">
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="color: #94a3b8; font-size: 13px; text-align: right;">סה״כ הוצאות לחודש</td>
-                  <td style="color: #0df280; font-size: 26px; font-weight: 900; text-align: left; direction: ltr;">₪${totalAmount.toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <td colspan="2" style="color: #475569; font-size: 12px; padding-top: 4px; text-align: right;">
-                    ${expenses.length} חשבוניות | נשלח ע"י ${userName || userEmail}
-                  </td>
-                </tr>
-              </table>
+            <td style="background: #0df28015; border-right: 1px solid #0df28030; border-left: 1px solid #0df28030; padding: 28px 36px; text-align: center;">
+              <p style="color: #94a3b8; font-size: 14px; margin: 0 0 8px 0; font-weight: 600;">סה״כ הוצאות לחודש</p>
+              <div style="color: #0df280; font-size: 36px; font-weight: 900; margin: 0 0 16px 0; letter-spacing: -0.5px; direction: ltr; display: inline-block;">
+                ₪${totalAmount.toLocaleString()}
+              </div>
+              <p style="color: #64748b; font-size: 13px; margin: 0;">
+                נשלח ע"י <strong style="color: #94a3b8;">${userName || userEmail}</strong> &nbsp;|&nbsp; סה"כ ${expenses.length} חשבוניות
+              </p>
             </td>
           </tr>
 
@@ -101,10 +97,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               <table width="100%" cellpadding="0" cellspacing="0">
                 <thead>
                   <tr style="background-color: #1e293b;">
-                    <th style="padding: 12px 16px; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; text-align: right;">תאריך</th>
-                    <th style="padding: 12px 16px; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; text-align: right;">ספק</th>
-                    <th style="padding: 12px 16px; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; text-align: right;">קטגוריה</th>
-                    <th style="padding: 12px 16px; color: #64748b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; text-align: left;">סכום</th>
+                    <th width="20%" style="padding: 14px 16px; color: #64748b; font-size: 12px; font-weight: 700; text-align: right;">תאריך</th>
+                    <th width="40%" style="padding: 14px 16px; color: #64748b; font-size: 12px; font-weight: 700; text-align: right;">ספק</th>
+                    <th width="25%" style="padding: 14px 16px; color: #64748b; font-size: 12px; font-weight: 700; text-align: right;">קטגוריה</th>
+                    <th width="15%" style="padding: 14px 16px; color: #64748b; font-size: 12px; font-weight: 700; text-align: left;">סכום</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -112,8 +108,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 </tbody>
                 <tfoot>
                   <tr style="background-color: #1e293b;">
-                    <td colspan="3" style="padding: 14px 16px; color: #f1f5f9; font-weight: 700; font-size: 14px; text-align: right;">סה״כ</td>
-                    <td style="padding: 14px 16px; color: #0df280; font-weight: 900; font-size: 16px; text-align: left; direction: ltr;">₪${totalAmount.toLocaleString()}</td>
+                    <td colspan="3" style="padding: 16px; color: #f1f5f9; font-weight: 700; font-size: 15px; text-align: right;">סה״כ הוצאות חודשיות</td>
+                    <td style="padding: 16px; color: #0df280; font-weight: 900; font-size: 17px; text-align: left; direction: ltr;">₪${totalAmount.toLocaleString()}</td>
                   </tr>
                 </tfoot>
               </table>
