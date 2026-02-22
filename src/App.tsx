@@ -1,4 +1,4 @@
-import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2, CreditCard, Lock } from 'lucide-react';
+import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2, CreditCard, Lock, Send } from 'lucide-react';
 import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
 import { Login } from './Login';
@@ -532,9 +532,19 @@ function Dashboard() {
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl">
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">חשבוניות שנסרקו</p>
                   <h3 className="text-2xl font-black">{invoiceCount}</h3>
-                  <p className="text-[10px] mt-2">
+                  <p className="text-[10px] mt-2 flex flex-col items-start gap-2">
                     {unsentCount > 0 ? (
-                      <span className="text-orange-400">{unsentCount} ממתינות לרו״ח</span>
+                      <>
+                        <span className="text-orange-400">{unsentCount} ממתינות לרו״ח</span>
+                        <button
+                          onClick={sendReportToAccountant}
+                          disabled={isSendingReport}
+                          className="w-full bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 py-1.5 rounded-lg text-[10px] font-bold transition-all relative z-0 flex items-center justify-center gap-1.5"
+                        >
+                          <Send className="w-3 h-3" />
+                          {isSendingReport ? 'שולח...' : 'שלח לרו״ח'}
+                        </button>
+                      </>
                     ) : (
                       <span className="text-[var(--color-primary)]">הכל נשלח ✓</span>
                     )}
@@ -855,6 +865,41 @@ function Dashboard() {
           onClose={() => setShowUpgradeModal(false)}
           featureName={upgradeFeature}
         />
+
+        {/* Report Preview Modal */}
+        {showReportPreview && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-display">
+            <div className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+              <div className="p-6 text-center space-y-4">
+                <div className="w-12 h-12 bg-[var(--color-primary)]/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--color-primary)]/30">
+                  <Send className="w-6 h-6 text-[var(--color-primary)]" />
+                </div>
+                <h2 className="text-xl font-black">שליחת דו״ח לרואה החשבון</h2>
+                <p className="text-sm text-[var(--color-text-muted)]">
+                  {unsentCount} חשבוניות חדשות ישלחו כקובץ מרוכז לכתובת:
+                  <br />
+                  <strong className="text-white mt-2 block">{accountantEmail}</strong>
+                </p>
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={confirmSendReport}
+                    disabled={isSendingReport}
+                    className="flex-1 bg-[var(--color-primary)] text-slate-900 font-bold py-3 rounded-xl hover:brightness-110 shadow-[0_0_15px_rgba(13,242,128,0.3)] transition-all flex items-center justify-center gap-2"
+                  >
+                    {isSendingReport ? 'שולח...' : 'אשר ושלח'}
+                  </button>
+                  <button
+                    onClick={() => setShowReportPreview(false)}
+                    disabled={isSendingReport}
+                    className="flex-1 bg-white/5 hover:bg-white/10 text-white font-medium py-3 rounded-xl transition-colors"
+                  >
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Review Modal */}
         {isReviewing && ocrResult && (
