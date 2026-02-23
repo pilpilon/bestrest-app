@@ -378,7 +378,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                     </div>
 
                     <h1 className="text-5xl md:text-7xl font-black leading-[1.1] tracking-tight mb-6">
-                        נהל את{' '}
+                        BestRest:{' '}
                         <span
                             className="inline-block"
                             style={{
@@ -387,9 +387,9 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                                 WebkitTextFillColor: 'transparent',
                             }}
                         >
-                            הכסף
+                            מערכת ניהול הוצאות
                         </span>{' '}
-                        של המסעדה שלך
+                        למסעדות מבוססת AI
                     </h1>
 
                     <p className="text-lg leading-relaxed mb-10" style={{ color: C.muted }}>
@@ -407,7 +407,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                                 boxShadow: `0 0 30px ${C.primary}55`,
                             }}
                         >
-                            התחל בחינם — ללא כרטיס אשראי
+                            פתח חשבון חינם למסעדה
                             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                         </button>
                         <a
@@ -415,7 +415,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                             className="flex items-center gap-2 px-6 py-4 rounded-xl font-bold text-sm border border-white/10 hover:bg-white/8 transition-all"
                             style={{ color: C.muted }}
                         >
-                            גלה יותר
+                            לחץ לקריאה על יכולות המערכת
                         </a>
                     </div>
 
@@ -506,8 +506,8 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                         יכולות המערכת
                     </p>
                     <h2 className="text-4xl md:text-5xl font-black">
-                        הכלים שמסעדות{' '}
-                        <span style={{ color: C.primary }}>רווחיות</span> משתמשות בהם
+                        ניהול פיננסי למסעדה:{' '}
+                        <span style={{ color: C.primary }}>הכלים שאתה צריך</span> כדי להיות רווחי
                     </h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -527,7 +527,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                         <p className="text-sm font-bold uppercase tracking-widest mb-3" style={{ color: C.primary }}>
                             איך זה עובד
                         </p>
-                        <h2 className="text-4xl font-black">3 צעדים פשוטים</h2>
+                        <h2 className="text-4xl font-black">ניהול ההוצאות ב-3 צעדים פשוטים</h2>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
                         {/* Connector line */}
