@@ -34,16 +34,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     year: 'numeric',
   });
 
-  // Beautiful Plain Text Template
-  let textContent = `📊 חשבוניות שנשלחו מ-BestRest
+  // Plain Text Template — no emoji (prevents attachment encoding in Outlook)
+  let textContent = `דוח חשבוניות - BestRest
 
 מסעדה: ${businessName || 'מסעדה'}
 חודש: ${monthYear}
 נשלח מ: ${userName || userEmail}
 
 =========================================
-💰 סה״כ הוצאות לחודש: ₪${totalAmount.toLocaleString()}
-📄 כמות חשבוניות מצורפות: ${expenses.length} חשבוניות
+סה"כ הוצאות לחודש: ${totalAmount.toLocaleString()} ש"ח
+כמות חשבוניות מצורפות: ${expenses.length} חשבוניות
 =========================================
 
 פירוט חשבוניות:
@@ -62,7 +62,7 @@ ${index + 1}. ספק: ${exp.supplier}
 הודעה זו מיועדת לרואה החשבון.
 החשבוניות מצורפות כקבצים למייל זה.
 
-נשלח אוטומטית באמצעות BestRest - מערכת ניהול הוצאות למסעדות 🚀
+נשלח אוטומטית באמצעות BestRest - מערכת ניהול הוצאות למסעדות.
 `;
 
   try {
@@ -105,7 +105,7 @@ ${index + 1}. ספק: ${exp.supplier}
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: [accountantEmail],
       replyTo: userEmail, // Accountant can reply directly to the restaurant owner
-      subject: `📊 חשבוניות שנשלחו — ${businessName || 'מסעדה'} — ${monthYear}`,
+      subject: `דוח חשבוניות - ${businessName || 'מסעדה'} - ${monthYear}`,
       text: textContent, // ONLY sending text, NO html
       attachments: attachments.length > 0 ? attachments : undefined,
     });
