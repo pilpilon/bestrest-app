@@ -91,6 +91,27 @@ export function useScanQueue(businessId: string | undefined) {
         await deleteDoc(doc(db, 'businesses', businessId, 'scanQueue', jobId));
     };
 
+    // Auto-fail jobs that are stuck in 'processing' for more than 3 minutes
+    // This handles cases where the app was closed during upload or network failed silently.
+    useEffect(() => {
+        if (!businessId || queueJobs.length === 0) return;
+
+        const interval = setInterval(() => {
+            const now = new Date();
+            queueJobs.forEach(job => {
+                if (job.status === 'processing' && job.uploadedAt && typeof job.uploadedAt.toDate === 'function') {
+                    const uploadedTime = job.uploadedAt.toDate();
+                    const diffMinutes = (now.getTime() - uploadedTime.getTime()) / (1000 * 60);
+                    if (diffMinutes > 3) {
+                        markError(job.id, 'הסריקה נקטעה (תקלת תקשורת או סגירת אפליקציה). אנא נסה שוב.');
+                    }
+                }
+            });
+        }, 15000); // Check every 15 seconds
+
+        return () => clearInterval(interval);
+    }, [queueJobs, businessId]);
+
     return {
         queueJobs,
         loading,

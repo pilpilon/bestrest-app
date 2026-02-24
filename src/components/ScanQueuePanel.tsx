@@ -51,9 +51,9 @@ export const ScanQueuePanel: React.FC<ScanQueuePanelProps> = ({ jobs, onReview, 
                                             מוכן לביקורת
                                         </span>
                                     ) : (
-                                        <span className="text-[10px] text-red-400 flex items-center gap-1">
-                                            <AlertCircle className="w-3 h-3" />
-                                            שגיאה בסריקה
+                                        <span className="text-[10px] text-red-400 flex items-center gap-1 max-w-[150px]" title={job.errorMessage || 'שגיאה בסריקה'}>
+                                            <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                                            <span className="truncate">{job.errorMessage || 'שגיאה בסריקה'}</span>
                                         </span>
                                     )}
                                 </div>
