@@ -1,0 +1,778 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+    Package, Plus, Search, Upload, Download, Trash2, Edit3, X, Save,
+    AlertTriangle, TrendingUp, TrendingDown, Tag, Loader2,
+} from 'lucide-react';
+import {
+    collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp
+} from 'firebase/firestore';
+import { db } from './firebase';
+import { useAuth } from './AuthContext';
+import { parseInventoryCSV, exportInventoryToCSV } from './utils/inventoryUtils';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface InventoryItem {
+    id: string;
+    name: string;
+    category: string;
+    aliases: string[];
+    quantity: number;
+    unit: string;
+    lastPrice: number;
+    previousPrice: number;
+    supplier: string;
+    lastDate: string;
+    minStock?: number;
+    updatedAt?: any;
+}
+
+interface ItemModalProps {
+    item: Partial<InventoryItem> | null;
+    allCategories: string[];
+    onClose: () => void;
+    onSave: (data: Partial<InventoryItem>) => Promise<void>;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DEFAULT_CATEGORIES = [
+    'חומרי גלם', 'שתייה', 'אלכוהול', 'ציוד', 'תחזוקה', 'כללי',
+];
+
+const CATEGORY_COLORS: Record<string, string> = {
+    'חומרי גלם': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    'שתייה': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    'אלכוהול': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    'ציוד': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    'תחזוקה': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    'כללי': 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+};
+
+const CATEGORY_DOT: Record<string, string> = {
+    'חומרי גלם': '#10b981',
+    'שתייה': '#3b82f6',
+    'אלכוהול': '#a855f7',
+    'ציוד': '#f97316',
+    'תחזוקה': '#eab308',
+    'כללי': '#64748b',
+};
+
+const UNITS = ['"ק"ג', 'גרם', 'ליטר', '"מ"ל', 'יחידה', 'קופסה', 'בקבוק', 'שקית', 'כוס', 'חבילה'];
+
+function getCategoryColor(category: string) {
+    return CATEGORY_COLORS[category] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+}
+
+function getCategoryDot(category: string) {
+    return CATEGORY_DOT[category] || '#64748b';
+}
+
+// ─── Item Modal ───────────────────────────────────────────────────────────────
+
+function ItemModal({ item, allCategories, onClose, onSave }: ItemModalProps) {
+    const isNew = !item?.id;
+    const [form, setForm] = useState({
+        name: item?.name || '',
+        category: item?.category || 'כללי',
+        quantity: item?.quantity?.toString() || '0',
+        unit: item?.unit || 'יחידה',
+        lastPrice: item?.lastPrice?.toString() || '0',
+        supplier: item?.supplier || '',
+        minStock: item?.minStock?.toString() || '1',
+        aliases: (item?.aliases || []).join(', '),
+        newCategory: '',
+    });
+    const [saving, setSaving] = useState(false);
+    const [showNewCat, setShowNewCat] = useState(false);
+
+    const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+        setForm(f => ({ ...f, [field]: e.target.value }));
+
+    const handleSave = async () => {
+        if (!form.name.trim()) return;
+        setSaving(true);
+        try {
+            const category = showNewCat && form.newCategory.trim() ? form.newCategory.trim() : form.category;
+            const aliasArr = form.aliases
+                .split(',')
+                .map(a => a.trim().toLowerCase())
+                .filter(Boolean);
+            await onSave({
+                ...item,
+                name: form.name.trim(),
+                category,
+                quantity: parseFloat(form.quantity) || 0,
+                unit: form.unit,
+                lastPrice: parseFloat(form.lastPrice) || 0,
+                supplier: form.supplier.trim(),
+                minStock: parseFloat(form.minStock) || 1,
+                aliases: aliasArr,
+            });
+            onClose();
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const inputCls = "w-full bg-slate-900/70 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-[var(--color-primary)] outline-none transition-colors text-sm";
+    const labelCls = "text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider block mb-1.5";
+
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4 font-display" onClick={onClose}>
+            <div
+                className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300 overflow-y-auto max-h-[90vh]"
+                onClick={e => e.stopPropagation()}
+                dir="rtl"
+            >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between p-6 pb-4 border-b border-white/5">
+                    <h2 className="text-xl font-black flex items-center gap-3">
+                        <Package className="w-5 h-5 text-[var(--color-primary)]" />
+                        {isNew ? 'הוסף מוצר חדש' : 'עריכת מוצר'}
+                    </h2>
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                        <X className="w-5 h-5 text-[var(--color-text-muted)]" />
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-4">
+                    {/* Name */}
+                    <div>
+                        <label className={labelCls}>שם המוצר *</label>
+                        <input className={inputCls} value={form.name} onChange={set('name')} placeholder="לדוגמה: עגבניות טריות" autoFocus />
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                        <label className={labelCls}>קטגוריה</label>
+                        <div className="flex gap-2">
+                            <select className={`flex-1 ${inputCls}`} value={form.category} onChange={set('category')}>
+                                {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={() => setShowNewCat(p => !p)}
+                                className="px-3 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-[var(--color-primary)] transition-colors whitespace-nowrap"
+                            >
+                                + חדש
+                            </button>
+                        </div>
+                        {showNewCat && (
+                            <input
+                                className={`mt-2 ${inputCls}`}
+                                value={form.newCategory}
+                                onChange={set('newCategory')}
+                                placeholder="שם קטגוריה חדשה..."
+                            />
+                        )}
+                    </div>
+
+                    {/* Quantity + Unit */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className={labelCls}>כמות במלאי</label>
+                            <input className={inputCls} type="number" value={form.quantity} onChange={set('quantity')} min="0" step="0.1" dir="ltr" />
+                        </div>
+                        <div>
+                            <label className={labelCls}>יחידת מידה</label>
+                            <select className={inputCls} value={form.unit} onChange={set('unit')}>
+                                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Price + Supplier */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className={labelCls}>מחיר אחרון (₪)</label>
+                            <input className={inputCls} type="number" value={form.lastPrice} onChange={set('lastPrice')} min="0" step="0.01" dir="ltr" />
+                        </div>
+                        <div>
+                            <label className={labelCls}>ספק</label>
+                            <input className={inputCls} value={form.supplier} onChange={set('supplier')} placeholder="שם הספק..." />
+                        </div>
+                    </div>
+
+                    {/* Min stock threshold */}
+                    <div>
+                        <label className={labelCls}>רף מלאי מינימלי (התראה)</label>
+                        <input className={inputCls} type="number" value={form.minStock} onChange={set('minStock')} min="0" step="1" dir="ltr" />
+                    </div>
+
+                    {/* Aliases */}
+                    <div>
+                        <label className={labelCls}>שמות נרדפים / Aliases (מופרדים בפסיקים)</label>
+                        <input className={inputCls} value={form.aliases} onChange={set('aliases')} placeholder="עגבניה, tomatoes, עגבניות שרי..." />
+                        <p className="text-[10px] text-[var(--color-text-muted)] mt-1">ה-AI ישדך מרכיבי מתכון לפי שמות אלה</p>
+                    </div>
+                </div>
+
+                <div className="px-6 pb-6">
+                    <button
+                        onClick={handleSave}
+                        disabled={saving || !form.name.trim()}
+                        className="w-full bg-[var(--color-primary)] text-slate-900 font-black py-4 rounded-xl hover:brightness-110 shadow-[0_0_15px_rgba(13,242,128,0.3)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        {saving ? 'שומר...' : 'שמור מוצר'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Product Card ─────────────────────────────────────────────────────────────
+
+function ProductCard({
+    item,
+    onEdit,
+    onDelete,
+}: {
+    item: InventoryItem;
+    onEdit: (item: InventoryItem) => void;
+    onDelete: (item: InventoryItem) => void;
+}) {
+    const minStock = item.minStock ?? 1;
+    const isLowStock = item.quantity <= minStock;
+    const priceDelta = item.lastPrice && item.previousPrice
+        ? ((item.lastPrice - item.previousPrice) / (item.previousPrice || 1)) * 100
+        : 0;
+    const catColor = getCategoryColor(item.category);
+    const dotColor = getCategoryDot(item.category);
+
+    return (
+        <div className={`group relative bg-white/5 backdrop-blur-md border rounded-2xl p-4 transition-all hover:bg-white/[0.08] hover:shadow-lg ${isLowStock ? 'border-red-500/30' : 'border-white/10'}`}>
+
+            {/* Action buttons on hover */}
+            <div className={`absolute top-3 ${isLowStock ? 'right-3' : 'left-3'} flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                <button onClick={() => onEdit(item)} className="p-1.5 bg-white/10 hover:bg-[var(--color-primary)]/20 hover:text-[var(--color-primary)] rounded-lg transition-all">
+                    <Edit3 className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => onDelete(item)} className="p-1.5 bg-white/10 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all">
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
+
+            {/* Low-stock badge */}
+            {isLowStock && (
+                <div className="absolute top-3 left-3 flex items-center gap-1 bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full text-[9px] font-bold animate-pulse">
+                    <AlertTriangle className="w-2.5 h-2.5" /> מלאי נמוך
+                </div>
+            )}
+
+            {/* Category dot + name */}
+            <div className="flex items-start gap-2 mb-3 mt-1">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: dotColor }} />
+                <div>
+                    <p className="font-bold text-white text-sm leading-tight">{item.name}</p>
+                    {item.aliases?.length > 0 && (
+                        <p className="text-[9px] text-[var(--color-text-muted)] mt-0.5 flex items-center gap-1">
+                            <Tag className="w-2.5 h-2.5" />
+                            {item.aliases.slice(0, 3).join(', ')}
+                            {item.aliases.length > 3 && ` +${item.aliases.length - 3}`}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {/* Category chip */}
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold border mb-3 ${catColor}`}>
+                {item.category}
+            </span>
+
+            {/* Quantity */}
+            <div className="bg-slate-900/60 rounded-xl p-2.5 mb-2 flex items-center justify-between">
+                <span className="text-[10px] text-[var(--color-text-muted)]">כמות</span>
+                <span className={`font-black text-base ${isLowStock ? 'text-red-400' : 'text-white'}`}>
+                    {item.quantity} <span className="text-xs font-normal text-[var(--color-text-muted)]">{item.unit}</span>
+                </span>
+            </div>
+
+            {/* Price row */}
+            <div className="flex items-center justify-between">
+                <span className="text-[10px] text-[var(--color-text-muted)]">
+                    {item.supplier && <span className="block truncate max-w-[90px]">{item.supplier}</span>}
+                    {item.lastDate && <span className="block">{item.lastDate}</span>}
+                </span>
+                <div className="text-left flex flex-col items-end gap-0.5">
+                    <span className="text-sm font-bold text-[var(--color-primary)]">₪{item.lastPrice?.toFixed(2)}</span>
+                    {Math.abs(priceDelta) >= 2 && (
+                        <span className={`text-[9px] font-bold flex items-center gap-0.5 ${priceDelta > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                            {priceDelta > 0 ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
+                            {Math.abs(priceDelta).toFixed(1)}%
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Main Inventory Screen ────────────────────────────────────────────────────
+
+export function Inventory() {
+    const { businessId } = useAuth();
+    const [items, setItems] = useState<InventoryItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [activeCategory, setActiveCategory] = useState('הכל');
+    const [editingItem, setEditingItem] = useState<Partial<InventoryItem> | null>(null);
+    const [showModal, setShowModal] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [importing, setImporting] = useState(false);
+    const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const csvInputRef = useRef<HTMLInputElement>(null);
+
+    // ── Firestore subscription ──────────────────────────────────────────────────
+    useEffect(() => {
+        if (!businessId) return;
+        const ref = collection(db, 'businesses', businessId, 'inventory');
+        const unsub = onSnapshot(ref, snap => {
+            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
+            setItems(docs.sort((a, b) => a.name.localeCompare(b.name, 'he')));
+            setLoading(false);
+        });
+        return () => unsub();
+    }, [businessId]);
+
+    const notify = useCallback((type: 'success' | 'error', message: string) => {
+        setNotification({ type, message });
+        setTimeout(() => setNotification(null), 4000);
+    }, []);
+
+    // ── All categories (built from data + defaults) ─────────────────────────────
+    const allCategories: string[] = Array.from(
+        new Set([...DEFAULT_CATEGORIES, ...items.map(i => i.category)])
+    );
+
+    // ── Filtered items ──────────────────────────────────────────────────────────
+    const filteredItems = items.filter(item => {
+        const matchesSearch =
+            !search ||
+            item.name.toLowerCase().includes(search.toLowerCase()) ||
+            (item.aliases || []).some(a => a.includes(search.toLowerCase())) ||
+            (item.supplier || '').toLowerCase().includes(search.toLowerCase());
+        const matchesCat = activeCategory === 'הכל' || item.category === activeCategory;
+        return matchesSearch && matchesCat;
+    });
+
+    // ── KPIs ───────────────────────────────────────────────────────────────────
+    const totalSKU = items.length;
+    const lowStockCount = items.filter(i => i.quantity <= (i.minStock ?? 1)).length;
+    const inventoryValue = items.reduce((sum, i) => sum + (i.quantity || 0) * (i.lastPrice || 0), 0);
+
+    // ── Save item ──────────────────────────────────────────────────────────────
+    const handleSave = async (data: Partial<InventoryItem>) => {
+        if (!businessId || !data.name) return;
+        const itemId = data.id || data.name.trim().replace(/[\s/.\\]+/g, '_').toLowerCase();
+        const itemRef = doc(db, 'businesses', businessId, 'inventory', itemId);
+        await setDoc(itemRef, { ...data, updatedAt: serverTimestamp() }, { merge: true });
+        notify('success', data.id ? 'המוצר עודכן בהצלחה ✓' : 'המוצר נוסף למלאי ✓');
+    };
+
+    // ── Delete item ─────────────────────────────────────────────────────────────
+    const handleDelete = async (item: InventoryItem) => {
+        if (!businessId) return;
+        try {
+            await deleteDoc(doc(db, 'businesses', businessId, 'inventory', item.id));
+            setDeleteConfirm(null);
+            notify('success', 'המוצר נמחק מהמלאי');
+        } catch {
+            notify('error', 'שגיאה במחיקת המוצר');
+        }
+    };
+
+    // ── CSV Import ─────────────────────────────────────────────────────────────
+    const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !businessId) return;
+        setImporting(true);
+        try {
+            const text = await file.text();
+            const rows = parseInventoryCSV(text);
+            if (rows.length === 0) { notify('error', 'לא נמצאו שורות תקינות בקובץ'); return; }
+            let count = 0;
+            for (const row of rows) {
+                const itemId = row.name.trim().replace(/[\s/.\\]+/g, '_').toLowerCase();
+                await setDoc(
+                    doc(db, 'businesses', businessId, 'inventory', itemId),
+                    { name: row.name, category: row.category, quantity: row.quantity, unit: row.unit, lastPrice: row.price, previousPrice: row.price, supplier: row.supplier, aliases: [], updatedAt: serverTimestamp() },
+                    { merge: true }
+                );
+                count++;
+            }
+            notify('success', `יובאו ${count} מוצרים בהצלחה ✓`);
+        } catch (err) {
+            console.error('CSV import error:', err);
+            notify('error', 'שגיאה בייבוא הקובץ. ודא שהפורמט תקין.');
+        } finally {
+            setImporting(false);
+            if (csvInputRef.current) csvInputRef.current.value = '';
+        }
+    };
+
+    // ── CSV Export ─────────────────────────────────────────────────────────────
+    const handleCSVExport = () => {
+        if (items.length === 0) { notify('error', 'אין מוצרים לייצוא'); return; }
+        const csv = exportInventoryToCSV(items);
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `inventory_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        notify('success', 'קובץ CSV יוצא בהצלחה ✓');
+    };
+
+    // ─── Render ─────────────────────────────────────────────────────────────────
+    return (
+        <div className="space-y-6" dir="rtl">
+
+            {/* Notification toast */}
+            {notification && (
+                <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full border backdrop-blur-md shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 ${notification.type === 'success' ? 'bg-[var(--color-primary)]/10 border-[var(--color-primary)]/50 text-[var(--color-primary)]' : 'bg-red-500/10 border-red-500/50 text-red-400'}`}>
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${notification.type === 'success' ? 'bg-[var(--color-primary)]' : 'bg-red-400'}`} />
+                    <span className="text-sm font-bold">{notification.message}</span>
+                </div>
+            )}
+
+            {/* Page Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-black flex items-center gap-3">
+                        <Package className="w-6 h-6 text-[var(--color-primary)]" />
+                        ניהול מלאי
+                    </h1>
+                    <p className="text-xs text-[var(--color-text-muted)] mt-1">מוצרים, כמויות, ומחירים בזמן אמת</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <input ref={csvInputRef} type="file" accept=".csv,.txt" className="hidden" onChange={handleCSVImport} />
+                    <button
+                        onClick={() => csvInputRef.current?.click()}
+                        disabled={importing}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-[var(--color-text-muted)] hover:text-white transition-all"
+                    >
+                        {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        <span className="hidden sm:inline">ייבא CSV</span>
+                    </button>
+                    <button
+                        onClick={handleCSVExport}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-[var(--color-text-muted)] hover:text-white transition-all"
+                    >
+                        <Download className="w-4 h-4" />
+                        <span className="hidden sm:inline">ייצא</span>
+                    </button>
+                    <button
+                        onClick={() => { setEditingItem({}); setShowModal(true); }}
+                        className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-slate-900 rounded-xl font-bold text-sm hover:brightness-110 shadow-[0_0_12px_rgba(13,242,128,0.3)] transition-all"
+                    >
+                        <Plus className="w-4 h-4" />
+                        <span>מוצר</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4">
+                    <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">סה״כ מוצרים</p>
+                    <p className="text-2xl font-black">{totalSKU}</p>
+                    <p className="text-[10px] text-[var(--color-text-muted)] mt-1">SKU פעילים</p>
+                </div>
+                <div className={`backdrop-blur-md border rounded-2xl p-4 ${lowStockCount > 0 ? 'bg-red-500/10 border-red-500/20' : 'bg-white/5 border-white/10'}`}>
+                    <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">מלאי נמוך</p>
+                    <p className={`text-2xl font-black ${lowStockCount > 0 ? 'text-red-400' : ''}`}>{lowStockCount}</p>
+                    <p className="text-[10px] text-[var(--color-text-muted)] mt-1">דורשים חידוש</p>
+                </div>
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4">
+                    <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">שווי מלאי</p>
+                    <p className="text-xl font-black text-[var(--color-primary)]">₪{inventoryValue.toLocaleString('he-IL', { maximumFractionDigits: 0 })}</p>
+                    <p className="text-[10px] text-[var(--color-text-muted)] mt-1">כמות × מחיר</p>
+                </div>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+                <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
+                <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="חיפוש מוצר, ספק, שם נרדף..."
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pr-11 pl-4 text-sm focus:border-[var(--color-primary)] outline-none transition-colors placeholder:text-[var(--color-text-muted)]"
+                />
+                {search && (
+                    <button onClick={() => setSearch('')} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white">
+                        <X className="w-4 h-4" />
+                    </button>
+                )}
+            </div>
+
+            {/* Category Tabs */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {['הכל', ...allCategories].map(cat => {
+                    const count = cat === 'הכל' ? items.length : items.filter(i => i.category === cat).length;
+                    const isActive = activeCategory === cat;
+                    return (
+                        <button
+                            key={cat}
+                            onClick={() => setActiveCategory(cat)}
+                            className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${isActive
+                                    ? 'bg-[var(--color-primary)] text-slate-900 border-[var(--color-primary)] shadow-[0_0_10px_rgba(13,242,128,0.3)]'
+                                    : 'bg-white/5 text-[var(--color-text-muted)] border-white/10 hover:bg-white/10 hover:text-white'
+                                }`}
+                        >
+                            {cat !== 'הכל' && (
+                                <span
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: isActive ? '#0f172a' : getCategoryDot(cat) }}
+                                />
+                            )}
+                            {cat}
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${isActive ? 'bg-slate-900/30' : 'bg-white/10'}`}>
+                                {count}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Items Grid */}
+            {loading ? (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
+                </div>
+            ) : filteredItems.length === 0 ? (
+                <div className="text-center py-20 space-y-4">
+                    <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mx-auto border border-white/10">
+                        <Package className="w-10 h-10 text-[var(--color-text-muted)]" />
+                    </div>
+                    <div>
+                        <p className="font-bold text-lg">{search ? 'לא נמצאו מוצרים' : 'המלאי ריק'}</p>
+                        <p className="text-sm text-[var(--color-text-muted)] mt-1">
+                            {search ? 'נסה חיפוש אחר' : 'הוסף מוצר ראשון או ייבא CSV'}
+                        </p>
+                    </div>
+                    {!search && (
+                        <button
+                            onClick={() => { setEditingItem({}); setShowModal(true); }}
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/30 rounded-xl font-bold text-sm hover:bg-[var(--color-primary)]/20 transition-all"
+                        >
+                            <Plus className="w-4 h-4" />
+                            הוסף מוצר ראשון
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <>
+                    <p className="text-xs text-[var(--color-text-muted)]">{filteredItems.length} מוצרים</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {filteredItems.map(item => (
+                            deleteConfirm === item.id ? (
+                                <div key={item.id} className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex flex-col items-center justify-center gap-3 text-center min-h-[160px]">
+                                    <p className="text-sm font-bold text-red-400">מחק את "{item.name}"?</p>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleDelete(item)}
+                                            className="px-3 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold hover:bg-red-500/30 transition-colors"
+                                        >
+                                            אשר מחיקה
+                                        </button>
+                                        <button
+                                            onClick={() => setDeleteConfirm(null)}
+                                            className="px-3 py-1.5 bg-white/5 text-white border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 transition-colors"
+                                        >
+                                            ביטול
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <ProductCard
+                                    key={item.id}
+                                    item={item}
+                                    onEdit={(i) => { setEditingItem(i); setShowModal(true); }}
+                                    onDelete={(i) => setDeleteConfirm(i.id)}
+                                />
+                            )
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {/* Low Stock Summary */}
+            {lowStockCount > 0 && activeCategory === 'הכל' && !search && (
+                <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4">
+                    <h3 className="text-sm font-bold text-red-400 flex items-center gap-2 mb-3">
+                        <AlertTriangle className="w-4 h-4" />
+                        דורשים חידוש מלאי ({lowStockCount})
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                        {items
+                            .filter(i => i.quantity <= (i.minStock ?? 1))
+                            .map(i => (
+                                <button
+                                    key={i.id}
+                                    onClick={() => { setEditingItem(i); setShowModal(true); }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-xs font-bold text-red-400 transition-colors"
+                                >
+                                    <Edit3 className="w-3 h-3" />
+                                    {i.name} ({i.quantity} {i.unit})
+                                </button>
+                            ))
+                        }
+                    </div>
+                </div>
+            )}
+
+            {/* Item Modal */}
+            {showModal && (
+                <ItemModal
+                    item={editingItem}
+                    allCategories={allCategories}
+                    onClose={() => { setShowModal(false); setEditingItem(null); }}
+                    onSave={handleSave}
+                />
+            )}
+        </div>
+    );
+}
+
+// ─── Inventory Picker (for RecipeBuilder) ─────────────────────────────────────
+
+export interface InventoryPickerItem {
+    id: string;
+    name: string;
+    unit: string;
+    quantity: number;
+    lastPrice: number;
+}
+
+interface InventoryPickerProps {
+    businessId: string | null;
+    value: string;
+    onChange: (val: string) => void;
+    onSelect: (item: InventoryPickerItem) => void;
+    onAdd: () => void;
+    placeholder?: string;
+}
+
+export function InventoryPicker({
+    businessId,
+    value,
+    onChange,
+    onSelect,
+    onAdd,
+    placeholder = 'חפש מוצר מהמלאי...',
+}: InventoryPickerProps) {
+    const [allItems, setAllItems] = useState<InventoryPickerItem[]>([]);
+    const [isOpen, setIsOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!businessId) return;
+        const ref = collection(db, 'businesses', businessId, 'inventory');
+        const unsub = onSnapshot(ref, snap => {
+            setAllItems(snap.docs.map(d => {
+                const data = d.data();
+                return { id: d.id, name: data.name, unit: data.unit || 'יחידה', quantity: data.quantity || 0, lastPrice: data.lastPrice || 0 };
+            }));
+        });
+        return () => unsub();
+    }, [businessId]);
+
+    const results = value.length >= 1
+        ? allItems.filter(i =>
+            i.name.toLowerCase().includes(value.toLowerCase()) ||
+            i.id.includes(value.toLowerCase())
+        ).slice(0, 8)
+        : [];
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (results.length === 1) {
+                onSelect(results[0]);
+                onChange('');
+                setIsOpen(false);
+            } else {
+                onAdd();
+                onChange('');
+                setIsOpen(false);
+            }
+        } else if (e.key === 'Escape') {
+            setIsOpen(false);
+        }
+    };
+
+    return (
+        <div ref={wrapperRef} className="relative flex-1">
+            <input
+                type="text"
+                placeholder={placeholder}
+                value={value}
+                onChange={e => { onChange(e.target.value); setIsOpen(true); }}
+                onFocus={() => setIsOpen(true)}
+                onKeyDown={handleKeyDown}
+                className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 pr-4 pl-12 text-sm focus:border-purple-500/50 outline-none transition-colors placeholder:text-gray-600 text-white"
+            />
+
+            {isOpen && value.length >= 1 && (
+                <div className="absolute top-full right-0 left-0 mt-1 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                    {results.length > 0 ? (
+                        <>
+                            <div className="px-3 py-2 border-b border-white/5">
+                                <p className="text-[9px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">מהמלאי שלך</p>
+                            </div>
+                            {results.map(item => (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => { onSelect(item); onChange(''); setIsOpen(false); }}
+                                    className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/5 text-right transition-colors border-b border-white/5 last:border-0"
+                                >
+                                    <div>
+                                        <p className="text-sm font-bold text-white">{item.name}</p>
+                                        <p className="text-[9px] text-[var(--color-text-muted)]">
+                                            במלאי: <span className={item.quantity <= 1 ? 'text-red-400' : 'text-[var(--color-primary)]'}>{item.quantity} {item.unit}</span>
+                                        </p>
+                                    </div>
+                                    <span className="text-xs font-bold text-[var(--color-primary)] ml-2 flex-shrink-0">₪{item.lastPrice?.toFixed(2)}</span>
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => { onAdd(); onChange(''); setIsOpen(false); }}
+                                className="w-full px-3 py-2 text-xs text-[var(--color-text-muted)] hover:text-white hover:bg-white/5 text-right transition-colors flex items-center gap-2"
+                            >
+                                <Plus className="w-3 h-3" />
+                                הוסף "{value}" עם הערכת AI
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => { onAdd(); onChange(''); setIsOpen(false); }}
+                            className="w-full px-3 py-3 text-sm text-[var(--color-text-muted)] hover:text-white hover:bg-white/5 text-right transition-colors flex items-center gap-2"
+                        >
+                            <Plus className="w-3 h-3 text-[var(--color-primary)]" />
+                            <span>הוסף <strong className="text-white">"{value}"</strong> (הערכת AI)</span>
+                        </button>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}

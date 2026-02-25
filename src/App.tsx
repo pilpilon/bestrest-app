@@ -1,4 +1,4 @@
-import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2, CreditCard, Lock, Send, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2, CreditCard, Lock, Send, BarChart3, Package } from 'lucide-react';
 import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
 import { UpgradeModal } from './UpgradeModal';
@@ -10,6 +10,7 @@ const Cookbook = lazy(() => import('./Cookbook').then(m => ({ default: m.Cookboo
 const Subscription = lazy(() => import('./Subscription').then(m => ({ default: m.Subscription })));
 const LandingPage = lazy(() => import('./LandingPage').then(m => ({ default: m.LandingPage })));
 const Reports = lazy(() => import('./Reports').then(m => ({ default: m.Reports })));
+const Inventory = lazy(() => import('./Inventory').then(m => ({ default: m.Inventory })));
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { initializePaddle } from './utils/paddle';
 import { generateMarketInsights } from './utils/marketInsights';
@@ -56,10 +57,11 @@ function Dashboard() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  let currentView: 'dashboard' | 'cookbook' | 'users' | 'subscription' | 'reports' = 'dashboard';
+  let currentView: 'dashboard' | 'cookbook' | 'users' | 'subscription' | 'reports' | 'inventory' = 'dashboard';
   let reportsSection: 'expenses' | 'suppliers' | null = null;
   if (currentPath.startsWith('/reports/suppliers')) { currentView = 'reports'; reportsSection = 'suppliers'; }
   else if (currentPath.startsWith('/reports')) { currentView = 'reports'; reportsSection = 'expenses'; }
+  else if (currentPath.startsWith('/inventory')) currentView = 'inventory';
   else if (currentPath.startsWith('/cookbook')) currentView = 'cookbook';
   else if (currentPath.startsWith('/users')) currentView = 'users';
   else if (currentPath.startsWith('/subscription')) currentView = 'subscription';
@@ -1010,6 +1012,8 @@ function Dashboard() {
             <Cookbook />
           ) : currentView === 'reports' ? (
             <Reports expenses={expenses} initialSection={reportsSection} />
+          ) : currentView === 'inventory' ? (
+            <Inventory />
           ) : currentView === 'subscription' ? (
             <Subscription />
           ) : (
@@ -1056,7 +1060,16 @@ function Dashboard() {
               <span className="text-[10px] font-medium">מתכונים</span>
             </button>
 
-            {/* 3. Settings */}
+            {/* 4. Inventory */}
+            <button
+              onClick={() => navigateTo('/inventory')}
+              className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'inventory' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}
+            >
+              <Package className="w-6 h-6" />
+              <span className="text-[10px] font-medium">מלאי</span>
+            </button>
+
+            {/* 5. Settings */}
             <button
               onClick={() => navigateTo('/users')}
               className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'users' ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}

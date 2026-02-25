@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { ChevronRight, Save, Utensils, Beaker, Plus, X, Camera, Loader2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { InventoryPicker, type InventoryPickerItem } from './Inventory';
 
 export interface Ingredient {
     id: string;
@@ -60,7 +61,20 @@ export function RecipeBuilder({ initialData, onBack, onSave }: RecipeBuilderProp
         }
     };
 
-    const addIngredient = () => {
+    const addIngredient = (fromInventory?: InventoryPickerItem) => {
+        if (fromInventory) {
+            // Selected from inventory picker
+            const id = Date.now().toString();
+            setIngredients(prev => [...prev, {
+                id,
+                rawText: fromInventory.name,
+                matchedItem: fromInventory.name,
+                cost: fromInventory.lastPrice,
+                source: 'inventory' as const,
+            }]);
+            return;
+        }
+        // Free-text: add + send to AI
         if (!newIngredient.trim()) return;
         const id = Date.now().toString();
         const text = newIngredient.trim();
@@ -285,19 +299,19 @@ export function RecipeBuilder({ initialData, onBack, onSave }: RecipeBuilderProp
                         ))}
                     </div>
 
-                    {/* Add Input */}
-                    <div className="flex gap-2 relative">
-                        <input
-                            type="text"
-                            placeholder="למשל: 150 גרם סלמון..."
+                    {/* Add Input — Inventory Picker */}
+                    <div className="flex gap-2 relative" dir="rtl">
+                        <InventoryPicker
+                            businessId={businessId}
                             value={newIngredient}
-                            onChange={e => setNewIngredient(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && addIngredient()}
-                            className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 pr-4 pl-12 text-sm focus:border-purple-500/50 outline-none transition-colors placeholder:text-gray-600 text-white"
+                            onChange={setNewIngredient}
+                            onSelect={(item) => addIngredient(item)}
+                            onAdd={() => addIngredient()}
+                            placeholder="חפש מוצר מהמלאי או הקלד בשפה חופשית..."
                         />
                         <button
-                            onClick={addIngredient}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-[var(--color-primary)] hover:text-slate-900 p-1.5 rounded-lg transition-all"
+                            onClick={() => addIngredient()}
+                            className="bg-white/10 hover:bg-[var(--color-primary)] hover:text-slate-900 p-3 rounded-xl transition-all flex-shrink-0"
                         >
                             <Plus className="w-4 h-4" />
                         </button>
