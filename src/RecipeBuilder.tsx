@@ -3,6 +3,51 @@ import { ChevronRight, Save, Utensils, Beaker, Plus, X, Camera, Loader2, Info, T
 import { useAuth } from './AuthContext';
 import { InventoryPicker, type InventoryPickerItem } from './Inventory';
 
+// ─── Unit conversion helpers ──────────────────────────────────────────────────
+
+const RECIPE_UNITS = ['גרם', 'ק"ג', 'מ"ל', 'ליטר', 'יחידה', 'כוס', 'כף', 'כפית'];
+
+/**
+ * Convert a quantity from one unit to a base unit (grams / ml / units).
+ * Returns the value in the same "family" base unit so we can compare apples to apples.
+ */
+function toBaseUnit(qty: number, unit: string): { value: number; family: string } {
+    const u = unit.replace(/"/g, '').trim();
+    switch (u) {
+        case 'קג':
+        case 'ק"ג':
+            return { value: qty * 1000, family: 'weight' };
+        case 'גרם':
+            return { value: qty, family: 'weight' };
+        case 'ליטר':
+            return { value: qty * 1000, family: 'volume' };
+        case 'מל':
+        case 'מ"ל':
+            return { value: qty, family: 'volume' };
+        default:
+            return { value: qty, family: 'unit' };
+    }
+}
+
+/**
+ * Calculate the proportional cost:
+ *   (usedQty converted to base) / (inventoryQty converted to base) × price
+ */
+function calcProportionalCost(
+    usedQty: number,
+    usedUnit: string,
+    invQty: number,
+    invUnit: string,
+    totalPrice: number
+): number {
+    if (!usedQty || !invQty || !totalPrice) return 0;
+    const used = toBaseUnit(usedQty, usedUnit);
+    const inv = toBaseUnit(invQty, invUnit);
+    // If families don't match (e.g. grams vs units), fallback to simple ratio
+    const ratio = used.value / inv.value;
+    return Math.round(ratio * totalPrice * 100) / 100;
+}
+
 export interface Ingredient {
     id: string;
     rawText: string;
@@ -10,6 +55,12 @@ export interface Ingredient {
     cost?: number;
     source?: 'inventory' | 'ai_estimate';
     priceChange?: number;
+    // Quantity-aware fields
+    usedQuantity?: number;
+    usedUnit?: string;
+    inventoryQuantity?: number;
+    inventoryUnit?: string;
+    inventoryPrice?: number;
 }
 
 export interface Recipe {
@@ -64,14 +115,37 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
 
     const addIngredient = (fromInventory?: InventoryPickerItem) => {
         if (fromInventory) {
-            // Selected from inventory picker
             const id = Date.now().toString();
+            // Default used quantity: if inventory is in kg, default to 100g; if liters, 100ml; otherwise 1 unit
+            const invUnit = fromInventory.unit || 'יחידה';
+            let defaultUsedQty = 1;
+            let defaultUsedUnit = invUnit;
+            const normalizedUnit = invUnit.replace(/"/g, '').trim();
+            if (normalizedUnit === 'קג' || normalizedUnit === 'ק"ג') {
+                defaultUsedQty = 100;
+                defaultUsedUnit = 'גרם';
+            } else if (normalizedUnit === 'ליטר') {
+                defaultUsedQty = 100;
+                defaultUsedUnit = 'מ"ל';
+            }
+
+            const cost = calcProportionalCost(
+                defaultUsedQty, defaultUsedUnit,
+                fromInventory.quantity, invUnit,
+                fromInventory.lastPrice
+            );
+
             setIngredients(prev => [...prev, {
                 id,
                 rawText: fromInventory.name,
                 matchedItem: fromInventory.name,
-                cost: fromInventory.lastPrice,
+                cost,
                 source: 'inventory' as const,
+                usedQuantity: defaultUsedQty,
+                usedUnit: defaultUsedUnit,
+                inventoryQuantity: fromInventory.quantity,
+                inventoryUnit: invUnit,
+                inventoryPrice: fromInventory.lastPrice,
             }]);
             return;
         }
@@ -86,6 +160,16 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
 
     const removeIngredient = (id: string) => {
         setIngredients(ingredients.filter(i => i.id !== id));
+    };
+
+    const updateIngredientQuantity = (id: string, qty: number, unit: string) => {
+        setIngredients(prev => prev.map(ing => {
+            if (ing.id !== id) return ing;
+            const newCost = ing.inventoryPrice && ing.inventoryQuantity && ing.inventoryUnit
+                ? calcProportionalCost(qty, unit, ing.inventoryQuantity, ing.inventoryUnit, ing.inventoryPrice)
+                : ing.cost;
+            return { ...ing, usedQuantity: qty, usedUnit: unit, cost: newCost };
+        }));
     };
 
     const calculatedCost = ingredients.reduce((sum, item) => sum + (item.cost || 0), 0);
@@ -294,33 +378,61 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
 
                     <div className="space-y-2 mt-4 text-right">
                         {ingredients.map(ing => (
-                            <div key={ing.id} className="flex items-center justify-between bg-white/5 border border-white/10 p-3 rounded-lg group">
-                                <div className="flex-1 ml-4 text-right">
-                                    <p className="font-medium text-sm text-white">{ing.rawText}</p>
-                                    {ing.matchedItem || ing.cost ? (
-                                        <div className="flex flex-col mt-1">
-                                            <div className="flex items-center gap-2">
-                                                {ing.source === 'inventory' ? (
-                                                    <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">מהמלאי</span>
-                                                ) : (
-                                                    <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded font-bold">הערכת AI</span>
-                                                )}
-                                                <p className="text-[10px] text-gray-400">{ing.matchedItem || 'זוהה'}</p>
-                                                {ing.priceChange && ing.priceChange !== 0 ? (
-                                                    <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${ing.priceChange > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
-                                                        {ing.priceChange > 0 ? '▲' : '▼'}{Math.abs(ing.priceChange)}%
-                                                    </span>
-                                                ) : null}
+                            <div key={ing.id} className="bg-white/5 border border-white/10 p-3 rounded-lg group">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1 ml-4 text-right">
+                                        <p className="font-medium text-sm text-white">{ing.rawText}</p>
+                                        {ing.matchedItem || ing.cost !== undefined ? (
+                                            <div className="flex flex-col mt-1">
+                                                <div className="flex items-center gap-2">
+                                                    {ing.source === 'inventory' ? (
+                                                        <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded font-bold">מהמלאי</span>
+                                                    ) : (
+                                                        <span className="text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded font-bold">הערכת AI</span>
+                                                    )}
+                                                    <p className="text-[10px] text-gray-400">{ing.matchedItem || 'זוהה'}</p>
+                                                    {ing.priceChange && ing.priceChange !== 0 ? (
+                                                        <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${ing.priceChange > 0 ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+                                                            {ing.priceChange > 0 ? '▲' : '▼'}{Math.abs(ing.priceChange)}%
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                                <p className="text-[10px] text-[var(--color-primary)] font-bold">₪{(ing.cost || 0).toFixed(2)}</p>
                                             </div>
-                                            <p className="text-[10px] text-[var(--color-primary)] font-bold">₪{ing.cost}</p>
-                                        </div>
-                                    ) : (
-                                        <p className="text-[10px] text-yellow-500 mt-1 flex items-center gap-1 opacity-60">ה-AI עדיין מחשב עלות...</p>
-                                    )}
+                                        ) : (
+                                            <p className="text-[10px] text-yellow-500 mt-1 flex items-center gap-1 opacity-60">ה-AI עדיין מחשב עלות...</p>
+                                        )}
+                                    </div>
+                                    <button onClick={() => removeIngredient(ing.id)} className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors p-2">
+                                        <X className="w-4 h-4" />
+                                    </button>
                                 </div>
-                                <button onClick={() => removeIngredient(ing.id)} className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors p-2">
-                                    <X className="w-4 h-4" />
-                                </button>
+
+                                {/* Quantity & Unit editor for inventory items */}
+                                {ing.source === 'inventory' && ing.inventoryPrice && (
+                                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+                                        <span className="text-[10px] text-[var(--color-text-muted)] flex-shrink-0">כמות למנה:</span>
+                                        <input
+                                            type="number"
+                                            value={ing.usedQuantity || ''}
+                                            onChange={e => updateIngredientQuantity(ing.id, parseFloat(e.target.value) || 0, ing.usedUnit || 'יחידה')}
+                                            className="w-20 bg-slate-900/70 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white text-center focus:border-[var(--color-primary)] outline-none"
+                                            dir="ltr"
+                                            min="0"
+                                            step="1"
+                                        />
+                                        <select
+                                            value={ing.usedUnit || 'יחידה'}
+                                            onChange={e => updateIngredientQuantity(ing.id, ing.usedQuantity || 0, e.target.value)}
+                                            className="bg-slate-900/70 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white focus:border-[var(--color-primary)] outline-none"
+                                        >
+                                            {RECIPE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                                        </select>
+                                        <span className="text-[9px] text-[var(--color-text-muted)] flex-shrink-0">
+                                            (במלאי: {ing.inventoryQuantity} {ing.inventoryUnit} ב-₪{ing.inventoryPrice})
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
