@@ -22,7 +22,8 @@ export function Cookbook() {
     // Profit Calculator State
     const [targetProfit, setTargetProfit] = useState<string>('');
 
-
+    // Delete Confirmation State
+    const [recipeToDelete, setRecipeToDelete] = useState<string | null>(null);
 
     useEffect(() => {
         if (!businessId) return;
@@ -58,12 +59,10 @@ export function Cookbook() {
         }
     };
 
-    const handleDeleteRecipe = async (e: React.MouseEvent | undefined, id: string) => {
-        if (e) e.stopPropagation();
-        if (!businessId || !window.confirm('האם אתה בטוח שברצונך למחוק מתכון זה?')) return;
-
+    const handleDeleteRecipe = async (id: string) => {
+        if (!businessId) return;
         await deleteDoc(doc(db, 'businesses', businessId, 'recipes', id));
-
+        setRecipeToDelete(null);
         if (editingRecipe?.id === id) {
             setEditingRecipe(null);
             setIsBuilding(false);
@@ -132,7 +131,7 @@ export function Cookbook() {
                 initialData={editingRecipe}
                 onBack={() => { setIsBuilding(false); setEditingRecipe(null); }}
                 onSave={handleSaveRecipe}
-                onDelete={(id) => handleDeleteRecipe(undefined, id)}
+                onDelete={(id) => setRecipeToDelete(id)}
             />
         );
     }
@@ -260,7 +259,7 @@ export function Cookbook() {
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    handleDeleteRecipe(e, recipe.id);
+                                    setRecipeToDelete(recipe.id);
                                 }}
                                 onPointerDown={(e) => e.stopPropagation()}
                                 className="absolute top-4 left-4 p-2 rounded-lg bg-red-500/10 text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-red-500/20 z-50 pointer-events-auto cursor-pointer"
@@ -326,6 +325,40 @@ export function Cookbook() {
                 onClose={() => setShowUpgradeModal(false)}
                 featureName="סריקת תפריט אוטומטית (AI)"
             />
+
+            {/* Delete Confirmation Dialog */}
+            {recipeToDelete && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4" dir="rtl">
+                    <div className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+                                <Trash2 className="w-5 h-5 text-red-400" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-white">מחיקת מנה</h3>
+                                <p className="text-xs text-gray-400">פעולה זו אינה ניתנת לביטול</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-gray-300 mb-6">האם אתה בטוח שברצונך למחוק מנה זו מספר המתכונים?</p>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setRecipeToDelete(null)}
+                                className="flex-1 py-2.5 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition-colors"
+                            >
+                                ביטול
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDeleteRecipe(recipeToDelete)}
+                                className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400 font-bold hover:bg-red-500/30 transition-colors"
+                            >
+                                מחק
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -26,7 +26,7 @@ interface RecipeBuilderProps {
     initialData?: Recipe | null;
     onBack: () => void;
     onSave: (recipe: any) => Promise<void>;
-    onDelete?: (id: string) => Promise<void>;
+    onDelete?: (id: string) => void | Promise<void>;
 }
 
 export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeBuilderProps) {
