@@ -256,12 +256,14 @@ export function Cookbook() {
                             className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-all cursor-pointer group flex flex-col h-full relative"
                         >
                             <button
+                                type="button"
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
                                     handleDeleteRecipe(e, recipe.id);
                                 }}
-                                className="absolute top-4 left-4 p-2 rounded-lg bg-red-500/10 text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-red-500/20 z-10"
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className="absolute top-4 left-4 p-2 rounded-lg bg-red-500/10 text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-red-500/20 z-50 pointer-events-auto cursor-pointer"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
