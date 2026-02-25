@@ -340,6 +340,12 @@ export function Inventory() {
     const [mergeTarget, setMergeTarget] = useState<{ keep: InventoryItem; remove: InventoryItem } | null>(null);
     const csvInputRef = useRef<HTMLInputElement>(null);
 
+    // ── Ignored Duplicates State ────────────────────────────────────────────────
+    const [ignoredPairs, setIgnoredPairs] = useState<Set<string>>(() => {
+        const saved = localStorage.getItem('inventory_ignored_duplicates');
+        return saved ? new Set(JSON.parse(saved)) : new Set();
+    });
+
     // ── Firestore subscription ──────────────────────────────────────────────────
     useEffect(() => {
         if (!businessId) return;
@@ -408,7 +414,13 @@ export function Inventory() {
             const a = normalizeForCompare(validItems[i].name);
             const b = normalizeForCompare(validItems[j].name);
             const pairKey = [validItems[i].id, validItems[j].id].sort().join('|');
-            if (!seenPairs.has(pairKey) && levenshtein(a, b) <= 2 && Math.abs(a.length - b.length) <= 3) {
+
+            if (
+                !seenPairs.has(pairKey) &&
+                !ignoredPairs.has(pairKey) &&
+                levenshtein(a, b) <= 2 &&
+                Math.abs(a.length - b.length) <= 3
+            ) {
                 duplicateGroups.push([validItems[i], validItems[j]]);
                 seenPairs.add(pairKey);
             }
@@ -432,6 +444,16 @@ export function Inventory() {
         } catch {
             notify('error', 'שגיאה במיזוג המוצרים');
         }
+    };
+
+    // ── Ignore Duplicate Pair ─────────────────────────────────────────────────────
+    const handleIgnorePair = (a: InventoryItem, b: InventoryItem) => {
+        const pairKey = [a.id, b.id].sort().join('|');
+        const newIgnored = new Set(ignoredPairs);
+        newIgnored.add(pairKey);
+        setIgnoredPairs(newIgnored);
+        localStorage.setItem('inventory_ignored_duplicates', JSON.stringify(Array.from(newIgnored)));
+        notify('success', 'ההצעה הוסרה מלוח הכפילויות');
     };
 
     // ── Save item ──────────────────────────────────────────────────────────────
@@ -751,6 +773,13 @@ export function Inventory() {
                                 >
                                     <GitMerge className="w-3 h-3" />
                                     השאר "{b.name}", מחק "{a.name}"
+                                </button>
+                                <button
+                                    onClick={() => handleIgnorePair(a, b)}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-slate-500/10 text-[var(--color-text-muted)] border border-white/10 rounded-lg text-[10px] font-bold hover:bg-white/10 hover:text-white transition-all w-full justify-center sm:w-auto mt-1 sm:mt-0"
+                                >
+                                    <X className="w-3 h-3" />
+                                    התעלם (מוצרים שונים)
                                 </button>
                             </div>
                         </div>
