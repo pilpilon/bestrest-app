@@ -42,7 +42,7 @@ async function parseHeadersWithGemini(rawText: string): Promise<{
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash-lite",
         generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -150,7 +150,7 @@ async function extractLineItemsFromImage(imageBase64: string, imageMimeType: str
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-pro", // Pro for max accuracy on Hebrew invoice image tables
             generationConfig: { responseMimeType: "application/json" }
         });
 
@@ -379,7 +379,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             console.log("Document AI entities OK, asking Gemini for category only");
             const { GoogleGenerativeAI } = await import('@google/generative-ai');
             const model = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!).getGenerativeModel({
-                model: "gemini-2.5-flash",
+                model: "gemini-2.5-flash-lite", // Lite is sufficient for simple category classification
                 generationConfig: { responseMimeType: "application/json" }
             });
             const catResult = await model.generateContent(

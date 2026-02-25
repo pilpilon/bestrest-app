@@ -43,9 +43,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const { GoogleGenerativeAI } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        // gemini-2.5-flash: full model for best accuracy on Hebrew invoice tables
+        // gemini-2.5-pro: upgraded for maximum accuracy on Hebrew invoice tables
         const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-pro',
             generationConfig: { responseMimeType: "application/json" }
         });
 
