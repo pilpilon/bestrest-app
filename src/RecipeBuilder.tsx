@@ -311,7 +311,8 @@ export function RecipeBuilder({ initialData, onBack, onSave }: RecipeBuilderProp
                         />
                         <button
                             onClick={() => addIngredient()}
-                            className="bg-white/10 hover:bg-[var(--color-primary)] hover:text-slate-900 p-3 rounded-xl transition-all flex-shrink-0"
+                            disabled={!newIngredient.trim()}
+                            className="bg-white/10 hover:bg-[var(--color-primary)] hover:text-slate-900 p-3 rounded-xl transition-all flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white/10 disabled:hover:text-white"
                         >
                             <Plus className="w-4 h-4" />
                         </button>
