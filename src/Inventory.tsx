@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
     Package, Plus, Search, Upload, Download, Trash2, Edit3, X, Save,
-    AlertTriangle, TrendingUp, TrendingDown, Tag, Loader2,
+    AlertTriangle, TrendingUp, TrendingDown, Tag, Loader2, GitMerge,
 } from 'lucide-react';
 import {
     collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp
@@ -122,12 +122,13 @@ function ItemModal({ item, allCategories, allSuppliers, onClose, onSave }: ItemM
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4 font-display" onClick={onClose}>
             <div
-                className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300 overflow-y-auto max-h-[90vh]"
+                className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300 flex flex-col"
+                style={{ maxHeight: 'calc(100vh - 100px)' }}
                 onClick={e => e.stopPropagation()}
                 dir="rtl"
             >
                 {/* Modal Header */}
-                <div className="flex items-center justify-between p-6 pb-4 border-b border-white/5">
+                <div className="flex items-center justify-between p-6 pb-4 border-b border-white/5 flex-shrink-0">
                     <h2 className="text-xl font-black flex items-center gap-3">
                         <Package className="w-5 h-5 text-[var(--color-primary)]" />
                         {isNew ? 'הוסף מוצר חדש' : 'עריכת מוצר'}
@@ -137,7 +138,8 @@ function ItemModal({ item, allCategories, allSuppliers, onClose, onSave }: ItemM
                     </button>
                 </div>
 
-                <div className="p-6 space-y-4">
+                {/* Scrollable body */}
+                <div className="p-6 space-y-4 overflow-y-auto flex-1">
                     {/* Name */}
                     <div>
                         <label className={labelCls}>שם המוצר *</label>
@@ -212,7 +214,8 @@ function ItemModal({ item, allCategories, allSuppliers, onClose, onSave }: ItemM
                     </div>
                 </div>
 
-                <div className="px-6 pb-6">
+                {/* Save button - always visible, not scrolled away */}
+                <div className="px-6 pb-6 pt-4 border-t border-white/5 flex-shrink-0 bg-[#0f172a]">
                     <button
                         onClick={handleSave}
                         disabled={saving || !form.name.trim()}
@@ -228,6 +231,7 @@ function ItemModal({ item, allCategories, allSuppliers, onClose, onSave }: ItemM
 }
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
+// Fully clickable card that opens the edit modal on tap (mobile-friendly)
 
 function ProductCard({
     item,
@@ -247,44 +251,36 @@ function ProductCard({
     const dotColor = getCategoryDot(item.category);
 
     return (
-        <div className={`group relative bg-white/5 backdrop-blur-md border rounded-2xl p-4 transition-all hover:bg-white/[0.08] hover:shadow-lg ${isLowStock ? 'border-red-500/30' : 'border-white/10'}`}>
-
-            {/* Action buttons on hover */}
-            <div className={`absolute top-3 ${isLowStock ? 'right-3' : 'left-3'} flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                <button onClick={() => onEdit(item)} className="p-1.5 bg-white/10 hover:bg-[var(--color-primary)]/20 hover:text-[var(--color-primary)] rounded-lg transition-all">
-                    <Edit3 className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => onDelete(item)} className="p-1.5 bg-white/10 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all">
+        <div
+            className={`relative bg-white/5 backdrop-blur-md border rounded-2xl p-4 transition-all active:scale-[0.97] cursor-pointer ${isLowStock ? 'border-red-500/40' : 'border-white/10'}`}
+            onClick={() => onEdit(item)}
+        >
+            {/* Top row: category chip + delete button */}
+            <div className="flex items-center justify-between mb-2">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold border ${catColor}`}>
+                    {item.category}
+                </span>
+                <button
+                    onClick={e => { e.stopPropagation(); onDelete(item); }}
+                    className="p-1.5 bg-white/5 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all text-[var(--color-text-muted)]"
+                    aria-label="מחק מוצר"
+                >
                     <Trash2 className="w-3.5 h-3.5" />
                 </button>
             </div>
 
             {/* Low-stock badge */}
             {isLowStock && (
-                <div className="absolute top-3 left-3 flex items-center gap-1 bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full text-[9px] font-bold animate-pulse">
+                <div className="flex items-center gap-1 bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full text-[9px] font-bold animate-pulse w-fit mb-2">
                     <AlertTriangle className="w-2.5 h-2.5" /> מלאי נמוך
                 </div>
             )}
 
-            {/* Category dot + name */}
-            <div className="flex items-start gap-2 mb-3 mt-1">
-                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: dotColor }} />
-                <div>
-                    <p className="font-bold text-white text-sm leading-tight">{item.name}</p>
-                    {item.aliases?.length > 0 && (
-                        <p className="text-[9px] text-[var(--color-text-muted)] mt-0.5 flex items-center gap-1">
-                            <Tag className="w-2.5 h-2.5" />
-                            {item.aliases.slice(0, 3).join(', ')}
-                            {item.aliases.length > 3 && ` +${item.aliases.length - 3}`}
-                        </p>
-                    )}
-                </div>
+            {/* Product name */}
+            <div className="flex items-start gap-2 mb-3">
+                <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: dotColor }} />
+                <p className="font-bold text-white text-sm leading-tight break-words min-w-0">{item.name}</p>
             </div>
-
-            {/* Category chip */}
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold border mb-3 ${catColor}`}>
-                {item.category}
-            </span>
 
             {/* Quantity */}
             <div className="bg-slate-900/60 rounded-xl p-2.5 mb-2 flex items-center justify-between">
@@ -296,11 +292,10 @@ function ProductCard({
 
             {/* Price row */}
             <div className="flex items-center justify-between">
-                <span className="text-[10px] text-[var(--color-text-muted)]">
-                    {item.supplier && <span className="block truncate max-w-[90px]">{item.supplier}</span>}
-                    {item.lastDate && <span className="block">{item.lastDate}</span>}
+                <span className="text-[10px] text-[var(--color-text-muted)] truncate max-w-[80px]">
+                    {item.supplier || item.lastDate || ''}
                 </span>
-                <div className="text-left flex flex-col items-end gap-0.5">
+                <div className="flex flex-col items-end gap-0.5">
                     <span className="text-sm font-bold text-[var(--color-primary)]">₪{item.lastPrice?.toFixed(2)}</span>
                     {Math.abs(priceDelta) >= 2 && (
                         <span className={`text-[9px] font-bold flex items-center gap-0.5 ${priceDelta > 0 ? 'text-red-400' : 'text-green-400'}`}>
@@ -310,11 +305,32 @@ function ProductCard({
                     )}
                 </div>
             </div>
+
+            {/* Edit hint */}
+            <div className="flex items-center justify-center gap-1 mt-2 text-[9px] text-[var(--color-text-muted)] opacity-60">
+                <Edit3 className="w-2.5 h-2.5" />
+                לחץ לעריכה
+            </div>
         </div>
     );
 }
 
 // ─── Main Inventory Screen ────────────────────────────────────────────────────
+
+// ── Levenshtein distance for duplicate detection ────────────────────────────
+function levenshtein(a: string, b: string): number {
+    const m = a.length, n = b.length;
+    const dp: number[][] = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            dp[i][j] = a[i - 1] === b[j - 1]
+                ? dp[i - 1][j - 1]
+                : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        }
+    }
+    return dp[m][n];
+}
 
 export function Inventory() {
     const { businessId } = useAuth();
@@ -327,6 +343,7 @@ export function Inventory() {
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
     const [importing, setImporting] = useState(false);
     const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [mergeTarget, setMergeTarget] = useState<{ keep: InventoryItem; remove: InventoryItem } | null>(null);
     const csvInputRef = useRef<HTMLInputElement>(null);
 
     // ── Firestore subscription ──────────────────────────────────────────────────
@@ -384,6 +401,40 @@ export function Inventory() {
     const totalSKU = validItems.length;
     const lowStockCount = validItems.filter(i => i.quantity <= (i.minStock ?? 1)).length;
     const inventoryValue = validItems.reduce((sum, i) => sum + (i.quantity || 0) * (i.lastPrice || 0), 0);
+
+    // ── Duplicate detection (Levenshtein distance <= 3 on normalized names) ────
+    const duplicateGroups: Array<[InventoryItem, InventoryItem]> = [];
+    const seenPairs = new Set<string>();
+    for (let i = 0; i < validItems.length; i++) {
+        for (let j = i + 1; j < validItems.length; j++) {
+            const a = validItems[i].name.trim().toLowerCase();
+            const b = validItems[j].name.trim().toLowerCase();
+            const pairKey = [validItems[i].id, validItems[j].id].sort().join('|');
+            if (!seenPairs.has(pairKey) && levenshtein(a, b) <= 3 && Math.abs(a.length - b.length) <= 5) {
+                duplicateGroups.push([validItems[i], validItems[j]]);
+                seenPairs.add(pairKey);
+            }
+        }
+    }
+
+    // ── Merge: keep item A, delete item B, merge aliases ────────────────────
+    const handleMerge = async (keep: InventoryItem, remove: InventoryItem) => {
+        if (!businessId) return;
+        try {
+            const mergedAliases = Array.from(new Set([
+                ...(keep.aliases || []),
+                ...(remove.aliases || []),
+                remove.name.toLowerCase().trim(),
+            ]));
+            const keepRef = doc(db, 'businesses', businessId, 'inventory', keep.id);
+            await setDoc(keepRef, { aliases: mergedAliases }, { merge: true });
+            await deleteDoc(doc(db, 'businesses', businessId, 'inventory', remove.id));
+            setMergeTarget(null);
+            notify('success', `מוזג: "${remove.name}" אל "${keep.name}"`);
+        } catch {
+            notify('error', 'שגיאה במיזוג המוצרים');
+        }
+    };
 
     // ── Save item ──────────────────────────────────────────────────────────────
     const handleSave = async (data: Partial<InventoryItem>) => {
@@ -673,6 +724,71 @@ export function Inventory() {
                     </div>
                 </>
             )}
+            {/* Duplicate Detection Panel */}
+            {duplicateGroups.length > 0 && !search && activeCategory === 'הכל' && (
+                <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <GitMerge className="w-4 h-4 text-yellow-400" />
+                        <p className="text-xs font-bold text-yellow-400">זוהו {duplicateGroups.length} מוצרים דומים שאולי כפולים</p>
+                    </div>
+                    {duplicateGroups.map(([a, b], idx) => (
+                        <div key={idx} className="bg-white/5 rounded-xl p-3 space-y-2">
+                            <div className="flex flex-col gap-1">
+                                <p className="text-xs text-[var(--color-text-muted)]">מוצרים דומים:</p>
+                                <p className="text-sm font-bold text-white">{a.name}</p>
+                                <p className="text-xs text-[var(--color-text-muted)]">↕</p>
+                                <p className="text-sm font-bold text-white">{b.name}</p>
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
+                                <button
+                                    onClick={() => setMergeTarget({ keep: a, remove: b })}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/30 rounded-lg text-[10px] font-bold hover:bg-[var(--color-primary)]/20 transition-all"
+                                >
+                                    <GitMerge className="w-3 h-3" />
+                                    השאר "{a.name}", מחק "{b.name}"
+                                </button>
+                                <button
+                                    onClick={() => setMergeTarget({ keep: b, remove: a })}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-white/5 text-[var(--color-text-muted)] border border-white/10 rounded-lg text-[10px] font-bold hover:bg-white/10 transition-all"
+                                >
+                                    <GitMerge className="w-3 h-3" />
+                                    השאר "{b.name}", מחק "{a.name}"
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Merge Confirmation Modal */}
+            {mergeTarget && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setMergeTarget(null)}>
+                    <div className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 w-full max-w-sm space-y-4" dir="rtl" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-black flex items-center gap-2">
+                            <GitMerge className="w-5 h-5 text-[var(--color-primary)]" />
+                            אישור מיזוג
+                        </h3>
+                        <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
+                            המוצר <strong className="text-white">"{mergeTarget.remove.name}"</strong> יימחק, ושמו יתווסף כ-alias למוצר <strong className="text-white">"{mergeTarget.keep.name}"</strong>.
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => handleMerge(mergeTarget.keep, mergeTarget.remove)}
+                                className="flex-1 bg-[var(--color-primary)] text-slate-900 font-black py-3 rounded-xl text-sm hover:brightness-110 transition-all"
+                            >
+                                אשר מיזוג
+                            </button>
+                            <button
+                                onClick={() => setMergeTarget(null)}
+                                className="flex-1 bg-white/5 text-white border border-white/10 font-bold py-3 rounded-xl text-sm hover:bg-white/10 transition-all"
+                            >
+                                ביטול
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Item Modal */}
             {showModal && (
                 <ItemModal
