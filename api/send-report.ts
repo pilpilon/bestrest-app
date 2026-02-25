@@ -96,29 +96,55 @@ ${expenses.map((exp: any, i: number) => `${i + 1}. ספק: ${exp.supplier} | ס�
     }
 
     // Prepare Attachments for Resend
-    const attachments = expenses
-      .filter((exp: any) => exp.imageUrl && exp.imageUrl.startsWith('data:'))
-      .map((exp: any, index: number) => {
-        // Resend needs pure base64 without the data URI prefix
-        const base64Data = exp.imageUrl.split(',')[1];
+    const attachments = await Promise.all(
+      expenses
+        .filter((exp: any) => exp.imageUrl) // keep anything that has an imageUrl
+        .map(async (exp: any, index: number) => {
+          let base64Data = '';
+          let extension = 'jpg';
 
-        // Extract content type to get extension
-        const contentTypePart = exp.imageUrl.split(';')[0];
-        const contentType = contentTypePart.split(':')[1] || 'image/jpeg';
-        const extension = contentType.split('/')[1] || 'jpg';
+          try {
+            if (exp.imageUrl.startsWith('data:')) {
+              // Handle legacy or direct base64 uploads
+              base64Data = exp.imageUrl.split(',')[1];
+              const contentTypePart = exp.imageUrl.split(';')[0];
+              const contentType = contentTypePart.split(':')[1] || 'image/jpeg';
+              extension = contentType.split('/')[1] || 'jpg';
+            } else {
+              // Handle normal URLs (like Cloudinary)
+              const response = await fetch(exp.imageUrl);
+              if (!response.ok) {
+                console.error(`Failed to fetch image ${exp.imageUrl}`);
+                return null;
+              }
+              const arrayBuffer = await response.arrayBuffer();
+              base64Data = Buffer.from(arrayBuffer).toString('base64');
 
-        // Sanitize supplier name for safe filename
-        const safeSupplier = (exp.supplier || 'invoice')
-          .replace(/[^a-z0-9א-ת]/gi, '_')
-          .substring(0, 20);
-        const safeDate = (exp.date || new Date().toISOString().split('T')[0])
-          .replace(/[^0-9]/g, '-');
+              // Try to guess extension from content-type or URL
+              const contentType = response.headers.get('content-type') || 'image/jpeg';
+              extension = contentType.split('/')[1] || 'jpg';
+            }
+          } catch (e) {
+            console.error(`Error processing attachment ${index}:`, e);
+            return null;
+          }
 
-        return {
-          filename: `${safeSupplier}_${safeDate}_${index + 1}.${extension}`,
-          content: base64Data,
-        };
-      });
+          // Sanitize supplier name for safe filename
+          const safeSupplier = (exp.supplier || 'invoice')
+            .replace(/[^a-z0-9א-ת]/gi, '_')
+            .substring(0, 20);
+          const safeDate = (exp.date || new Date().toISOString().split('T')[0])
+            .replace(/[^0-9]/g, '-');
+
+          return {
+            filename: `${safeSupplier}_${safeDate}_${index + 1}.${extension}`,
+            content: base64Data,
+          };
+        })
+    );
+
+    // Filter out any failed attachments
+    const validAttachments = attachments.filter(Boolean);
 
     const { data, error } = await resend.emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
@@ -127,7 +153,7 @@ ${expenses.map((exp: any, i: number) => `${i + 1}. ספק: ${exp.supplier} | ס�
       subject: `דוח חשבוניות - ${businessName || 'מסעדה'} - ${monthYear}`,
       text: textContent,
       html: htmlContent,
-      attachments: attachments.length > 0 ? attachments : undefined,
+      attachments: validAttachments.length > 0 ? validAttachments as any[] : undefined,
     });
 
     if (error) {
