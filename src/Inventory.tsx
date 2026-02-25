@@ -878,7 +878,7 @@ export function InventoryPicker({
             i.name.toLowerCase().includes(value.toLowerCase()) ||
             i.id.includes(value.toLowerCase())
         ).slice(0, 8)
-        : [];
+        : allItems.slice(0, 8);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -915,12 +915,13 @@ export function InventoryPicker({
                 value={value}
                 onChange={e => { onChange(e.target.value); setIsOpen(true); }}
                 onFocus={() => setIsOpen(true)}
+                onClick={() => setIsOpen(true)}
                 onKeyDown={handleKeyDown}
                 className="w-full bg-slate-900/50 border border-white/10 rounded-xl py-3 pr-4 pl-12 text-sm focus:border-purple-500/50 outline-none transition-colors placeholder:text-gray-600 text-white"
             />
 
-            {isOpen && value.length >= 1 && (
-                <div className="absolute top-full right-0 left-0 mt-1 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+            {isOpen && results.length > 0 && (
+                <div className="absolute top-full right-0 left-0 mt-1 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
                     {results.length > 0 ? (
                         <>
                             <div className="px-3 py-2 border-b border-white/5">
