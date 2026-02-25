@@ -267,8 +267,11 @@ function Dashboard() {
         createdAt: serverTimestamp(),
       });
 
+      // Categories that should NOT be tracked in inventory
+      const EXCLUDED_INVENTORY_CATEGORIES = ['חשמל / מים / גז', 'שכירות', 'עובדים', 'תחזוקה', 'חשבונות'];
+
       // Save line items to inventory collection
-      if (finalData.lineItems && finalData.lineItems.length > 0) {
+      if (finalData.lineItems && finalData.lineItems.length > 0 && !EXCLUDED_INVENTORY_CATEGORIES.includes(finalData.category)) {
         for (const item of finalData.lineItems) {
           if (!item.name || !item.pricePerUnit) continue;
 

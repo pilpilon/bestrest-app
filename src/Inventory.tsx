@@ -30,6 +30,7 @@ export interface InventoryItem {
 interface ItemModalProps {
     item: Partial<InventoryItem> | null;
     allCategories: string[];
+    allSuppliers: string[];
     onClose: () => void;
     onSave: (data: Partial<InventoryItem>) => Promise<void>;
 }
@@ -70,7 +71,7 @@ function getCategoryDot(category: string) {
 
 // ─── Item Modal ───────────────────────────────────────────────────────────────
 
-function ItemModal({ item, allCategories, onClose, onSave }: ItemModalProps) {
+function ItemModal({ item, allCategories, allSuppliers, onClose, onSave }: ItemModalProps) {
     const isNew = !item?.id;
     const [form, setForm] = useState({
         name: item?.name || '',
@@ -185,12 +186,15 @@ function ItemModal({ item, allCategories, onClose, onSave }: ItemModalProps) {
                     {/* Price + Supplier */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className={labelCls}>מחיר אחרון (₪)</label>
+                            <label className={labelCls}>מחיר אחרון (₪) ל-{form.unit}</label>
                             <input className={inputCls} type="number" value={form.lastPrice} onChange={set('lastPrice')} min="0" step="0.01" dir="ltr" />
                         </div>
                         <div>
                             <label className={labelCls}>ספק</label>
-                            <input className={inputCls} value={form.supplier} onChange={set('supplier')} placeholder="שם הספק..." />
+                            <input className={inputCls} list="suppliers-list" value={form.supplier} onChange={set('supplier')} placeholder="שם הספק..." />
+                            <datalist id="suppliers-list">
+                                {allSuppliers.map(s => <option key={s} value={s} />)}
+                            </datalist>
                         </div>
                     </div>
 
@@ -342,13 +346,20 @@ export function Inventory() {
         setTimeout(() => setNotification(null), 4000);
     }, []);
 
+    const EXCLUDED = ['חשמל / מים / גז', 'שכירות', 'עובדים', 'חשבונות'];
+    const validItems = items.filter(i => !EXCLUDED.includes(i.category) && !EXCLUDED.some(ex => i.name.includes(ex)));
+
     // ── All categories (built from data + defaults) ─────────────────────────────
     const allCategories: string[] = Array.from(
-        new Set([...DEFAULT_CATEGORIES, ...items.map(i => i.category)])
+        new Set([...DEFAULT_CATEGORIES, ...validItems.map(i => i.category)])
+    );
+
+    const allSuppliers: string[] = Array.from(
+        new Set(validItems.map(i => i.supplier).filter(Boolean))
     );
 
     // ── Filtered items ──────────────────────────────────────────────────────────
-    const filteredItems = items.filter(item => {
+    const filteredItems = validItems.filter(item => {
         const matchesSearch =
             !search ||
             item.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -359,19 +370,76 @@ export function Inventory() {
     });
 
     // ── KPIs ───────────────────────────────────────────────────────────────────
-    const totalSKU = items.length;
-    const lowStockCount = items.filter(i => i.quantity <= (i.minStock ?? 1)).length;
-    const inventoryValue = items.reduce((sum, i) => sum + (i.quantity || 0) * (i.lastPrice || 0), 0);
+    const totalSKU = validItems.length;
+    const lowStockCount = validItems.filter(i => i.quantity <= (i.minStock ?? 1)).length;
+    const inventoryValue = validItems.reduce((sum, i) => sum + (i.quantity || 0) * (i.lastPrice || 0), 0);
 
     // ── Save item ──────────────────────────────────────────────────────────────
     const handleSave = async (data: Partial<InventoryItem>) => {
-        if (!businessId || !data.name) return;
-        const itemId = data.id || data.name.trim().replace(/[\s/.\\]+/g, '_').toLowerCase();
-        const itemRef = doc(db, 'businesses', businessId, 'inventory', itemId);
-        await setDoc(itemRef, { ...data, updatedAt: serverTimestamp() }, { merge: true });
-        notify('success', data.id ? 'המוצר עודכן בהצלחה ✓' : 'המוצר נוסף למלאי ✓');
+        if (!businessId) return;
+        try {
+            const isNew = !data.id;
+            let ref;
+            if (isNew) {
+                ref = doc(collection(db, 'businesses', businessId, 'inventory'));
+            } else {
+                ref = doc(db, 'businesses', businessId, 'inventory', data.id!);
+            }
+            await setDoc(ref, {
+                ...data,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+
+            setShowModal(false);
+            setEditingItem(null);
+            notify('success', isNew ? 'מוצר חדש נוסף למלאי' : 'המוצר עודכן בהצלחה');
+        } catch {
+            notify('error', 'שגיאה בשמירת המוצר');
+        }
     };
 
+    // ── Temporary Migration: Auto-categorize "כללי" based on name ────────────────
+    const handleRunMigration = async () => {
+        if (!businessId || !window.confirm('האם להריץ מיגרציית קטגוריות? פעולה זו תשייך מוצרים ב"כללי" לקטגוריות מתאימות אוטומטית לפי שמם.')) return;
+
+        try {
+            const RULES = [
+                { cat: 'שתייה', keywords: ['קולה', 'זירו', 'ספרייט', 'פאנטה', 'מיץ', 'מים', 'נביעות', 'סודה', 'טרופית', 'פיוז טי', 'משקה', 'נסטי', 'קינלי', 'שוופס'] },
+                { cat: 'אלכוהול', keywords: ['בירה', 'יין', 'וודקה', 'וויסקי', 'ערק', 'גולדסטאר', 'מכבי', 'היינקן', 'קורונה', 'סטלה', 'טובורג', 'קמפרי', 'רום', 'קברנה', 'מרלו'] },
+                { cat: 'ציוד', keywords: ['כוס', 'צלחת', 'מזלג', 'סכין', 'כף', 'כפיות', 'מפית', 'מפה', 'קופסה', 'שקית', 'נייר', 'רדיד', 'ניילון', 'מגבון', 'קש', 'תבנית'] },
+                { cat: 'תחזוקה', keywords: ['אקונומיקה', 'סבון', 'נוזל', 'מסיר', 'מטאטא', 'מגב', 'סמרטוט', 'כפפות', 'פח', 'ניקוי', 'חומר', 'מרכך', 'מנקה', 'אשפה'] },
+                { cat: 'חומרי גלם', keywords: ['עגבני', 'מלפפון', 'בצל', 'שום', 'חסה', 'תפוח', 'תפוז', 'לימון', 'גזר', 'פלפל', 'כרוב', 'פטרוזיליה', 'כוסברה', 'נענע', 'פטרי', 'בשר', 'עוף', 'בקר', 'אנטריקוט', 'המבורגר', 'חזה', 'שוק', 'דג', 'סלמון', 'לחמני', 'פית', 'לחם', 'קמח', 'שמן', 'סוכר', 'מלח', 'פפריקה', 'כמון', 'תבלין', 'רוטב', 'קטשופ', 'מיונז', 'חרדל', 'טריאקי', 'סויה', 'צ\'ילי', 'חלב', 'גבינ', 'חמאה', 'שמנת', 'ביצ', 'טופו', 'אורז', 'פסטה', 'פתיתים', 'צ\'יפס', 'זיתים', 'שימורים', 'רסק'] }
+            ];
+
+            let updated = 0;
+            const itemsToCheck = items.filter(i => !i.category || i.category === 'כללי');
+
+            for (const item of itemsToCheck) {
+                const lowerName = (item.name || '').toLowerCase();
+                let newCat = null;
+
+                for (const rule of RULES) {
+                    for (const kw of rule.keywords) {
+                        if (lowerName.includes(kw)) {
+                            newCat = rule.cat;
+                            break;
+                        }
+                    }
+                    if (newCat) break;
+                }
+
+                if (newCat) {
+                    const refDoc = doc(db, 'businesses', businessId, 'inventory', item.id);
+                    await setDoc(refDoc, { category: newCat }, { merge: true });
+                    updated++;
+                }
+            }
+            notify('success', `מיגרציה הושלמה! עודכנו ${updated} מוצרים.`);
+        } catch (err) {
+            console.error(err);
+            notify('error', 'שגיאה במיגרציה');
+        }
+    };
     // ── Delete item ─────────────────────────────────────────────────────────────
     const handleDelete = async (item: InventoryItem) => {
         if (!businessId) return;
@@ -381,6 +449,23 @@ export function Inventory() {
             notify('success', 'המוצר נמחק מהמלאי');
         } catch {
             notify('error', 'שגיאה במחיקת המוצר');
+        }
+    };
+
+    // ── Delete Custom Category ──────────────────────────────────────────────────
+    const handleDeleteCategory = async (categoryToDelete: string) => {
+        if (!businessId || !window.confirm(`האם אתה בטוח שברצונך למחוק את הקטגוריה "${categoryToDelete}"? כל המוצרים תחתיה יועברו ל"כללי".`)) return;
+
+        try {
+            const itemsToUpdate = items.filter(i => i.category === categoryToDelete);
+            for (const item of itemsToUpdate) {
+                const ref = doc(db, 'businesses', businessId, 'inventory', item.id);
+                await setDoc(ref, { category: 'כללי' }, { merge: true });
+            }
+            setActiveCategory('הכל');
+            notify('success', 'הקטגוריה נמחקה והמוצרים הועברו ל"כללי"');
+        } catch (err) {
+            notify('error', 'שגיאה במחיקת הקטגוריה');
         }
     };
 
@@ -514,15 +599,15 @@ export function Inventory() {
             {/* Category Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                 {['הכל', ...allCategories].map(cat => {
-                    const count = cat === 'הכל' ? items.length : items.filter(i => i.category === cat).length;
+                    const count = cat === 'הכל' ? validItems.length : validItems.filter(i => i.category === cat).length;
                     const isActive = activeCategory === cat;
                     return (
                         <button
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
                             className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${isActive
-                                    ? 'bg-[var(--color-primary)] text-slate-900 border-[var(--color-primary)] shadow-[0_0_10px_rgba(13,242,128,0.3)]'
-                                    : 'bg-white/5 text-[var(--color-text-muted)] border-white/10 hover:bg-white/10 hover:text-white'
+                                ? 'bg-[var(--color-primary)] text-slate-900 border-[var(--color-primary)] shadow-[0_0_10px_rgba(13,242,128,0.3)]'
+                                : 'bg-white/5 text-[var(--color-text-muted)] border-white/10 hover:bg-white/10 hover:text-white'
                                 }`}
                         >
                             {cat !== 'הכל' && (
@@ -539,6 +624,23 @@ export function Inventory() {
                     );
                 })}
             </div>
+
+            {/* Delete Custom Category Action */}
+            {activeCategory !== 'הכל' && !DEFAULT_CATEGORIES.includes(activeCategory) && (
+                <div className="flex items-center justify-between bg-white/5 border border-white/10 p-3 rounded-2xl animate-in fade-in">
+                    <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-2">
+                        <Tag className="w-4 h-4 text-[var(--color-primary)]" />
+                        <span>קטגוריה מותאמת אישית: <strong className="text-white">{activeCategory}</strong></span>
+                    </p>
+                    <button
+                        onClick={() => handleDeleteCategory(activeCategory)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-[10px] font-bold transition-all"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        מחק קטגוריה
+                    </button>
+                </div>
+            )}
 
             {/* Items Grid */}
             {loading ? (
@@ -610,7 +712,7 @@ export function Inventory() {
                         דורשים חידוש מלאי ({lowStockCount})
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                        {items
+                        {validItems
                             .filter(i => i.quantity <= (i.minStock ?? 1))
                             .map(i => (
                                 <button
@@ -627,11 +729,26 @@ export function Inventory() {
                 </div>
             )}
 
+            {/* Secret Migration Button For Admin/User to fix categories instantly in production */}
+            {items.some(i => i.category === 'כללי' || !i.category) && (
+                <div className="mt-8 mb-4 flex justify-center opacity-30 hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={handleRunMigration}
+                        className="text-[10px] bg-slate-800 text-slate-400 px-3 py-1 rounded-full flex items-center gap-1 border border-slate-700 hover:border-slate-500"
+                        title="הפעלת מיגרציה אוטומטית לסידור קטגוריות"
+                    >
+                        <Tag className="w-3 h-3" />
+                        סידור קטגוריות אוטומטי (מיגרציה)
+                    </button>
+                </div>
+            )}
+
             {/* Item Modal */}
             {showModal && (
                 <ItemModal
                     item={editingItem}
                     allCategories={allCategories}
+                    allSuppliers={allSuppliers}
                     onClose={() => { setShowModal(false); setEditingItem(null); }}
                     onSave={handleSave}
                 />
