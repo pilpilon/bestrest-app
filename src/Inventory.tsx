@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-    Package, Plus, Search, Upload, Download, Trash2, Edit3, X, Save,
+    Package, Plus, Search, Upload, Download, Trash2, X, Save,
     AlertTriangle, TrendingUp, TrendingDown, Tag, Loader2, GitMerge,
 } from 'lucide-react';
 import {
@@ -269,13 +269,6 @@ function ProductCard({
                 </button>
             </div>
 
-            {/* Low-stock badge */}
-            {isLowStock && (
-                <div className="flex items-center gap-1 bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full text-[9px] font-bold animate-pulse w-fit mb-2">
-                    <AlertTriangle className="w-2.5 h-2.5" /> מלאי נמוך
-                </div>
-            )}
-
             {/* Product name */}
             <div className="flex items-start gap-2 mb-3">
                 <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: dotColor }} />
@@ -306,11 +299,12 @@ function ProductCard({
                 </div>
             </div>
 
-            {/* Edit hint */}
-            <div className="flex items-center justify-center gap-1 mt-2 text-[9px] text-[var(--color-text-muted)] opacity-60">
-                <Edit3 className="w-2.5 h-2.5" />
-                לחץ לעריכה
-            </div>
+            {/* Low-stock badge (moved from top) */}
+            {isLowStock && (
+                <div className="flex items-center justify-center gap-1 mt-3 bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1 rounded-full text-[10px] font-bold animate-pulse w-fit mx-auto">
+                    <AlertTriangle className="w-3 h-3" /> מלאי נמוך
+                </div>
+            )}
         </div>
     );
 }
@@ -402,15 +396,19 @@ export function Inventory() {
     const lowStockCount = validItems.filter(i => i.quantity <= (i.minStock ?? 1)).length;
     const inventoryValue = validItems.reduce((sum, i) => sum + (i.quantity || 0) * (i.lastPrice || 0), 0);
 
-    // ── Duplicate detection (Levenshtein distance <= 3 on normalized names) ────
+    // ── Duplicate detection (Levenshtein distance <= 2 on stripped names) ──────
     const duplicateGroups: Array<[InventoryItem, InventoryItem]> = [];
     const seenPairs = new Set<string>();
+
+    // Strip spaces/punctuation to catch minor OCR variations (e.g., "ביצים 12 יח." vs "ביצים 12 יח / ל")
+    const normalizeForCompare = (name: string) => name.replace(/[\s\.\/\-\\\(\)\[\]]+/g, '').toLowerCase();
+
     for (let i = 0; i < validItems.length; i++) {
         for (let j = i + 1; j < validItems.length; j++) {
-            const a = validItems[i].name.trim().toLowerCase();
-            const b = validItems[j].name.trim().toLowerCase();
+            const a = normalizeForCompare(validItems[i].name);
+            const b = normalizeForCompare(validItems[j].name);
             const pairKey = [validItems[i].id, validItems[j].id].sort().join('|');
-            if (!seenPairs.has(pairKey) && levenshtein(a, b) <= 3 && Math.abs(a.length - b.length) <= 5) {
+            if (!seenPairs.has(pairKey) && levenshtein(a, b) <= 2 && Math.abs(a.length - b.length) <= 3) {
                 duplicateGroups.push([validItems[i], validItems[j]]);
                 seenPairs.add(pairKey);
             }
