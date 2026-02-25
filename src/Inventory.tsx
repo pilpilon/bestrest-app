@@ -120,10 +120,10 @@ function ItemModal({ item, allCategories, allSuppliers, onClose, onSave }: ItemM
     const labelCls = "text-[10px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider block mb-1.5";
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4 font-display" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 font-display" onClick={onClose}>
             <div
                 className="bg-[#0f172a] border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-300 flex flex-col"
-                style={{ maxHeight: 'calc(100vh - 100px)' }}
+                style={{ maxHeight: '90vh' }}
                 onClick={e => e.stopPropagation()}
                 dir="rtl"
             >
