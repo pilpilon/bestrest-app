@@ -62,13 +62,22 @@ export const ScanQueuePanel: React.FC<ScanQueuePanelProps> = ({ jobs, onReview, 
 
                         <div className="flex items-center gap-2">
                             {job.status === 'ready' && (
-                                <button
-                                    onClick={() => onReview(job)}
-                                    className="bg-[var(--color-primary)] text-slate-900 py-1.5 px-3 rounded-lg text-[10px] font-black shadow-[0_0_10px_rgba(13,242,128,0.3)] hover:brightness-110 transition-all flex items-center gap-1.5"
-                                >
-                                    <Eye className="w-3 h-3" />
-                                    ביקורת
-                                </button>
+                                <>
+                                    <button
+                                        onClick={() => onReview(job)}
+                                        className="bg-[var(--color-primary)] text-slate-900 py-1.5 px-3 rounded-lg text-[10px] font-black shadow-[0_0_10px_rgba(13,242,128,0.3)] hover:brightness-110 transition-all flex items-center gap-1.5"
+                                    >
+                                        <Eye className="w-3 h-3" />
+                                        ביקורת
+                                    </button>
+                                    <button
+                                        onClick={() => onRemove(job.id)}
+                                        className="p-1.5 hover:bg-red-500/20 text-white/30 hover:text-red-400 rounded-lg transition-colors"
+                                        title="מחק סריקה"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </>
                             )}
                             {job.status === 'error' && (
                                 <button

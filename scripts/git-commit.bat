@@ -1,3 +1,3 @@
 git add .
-git commit -m "fix(inventory): strip migration UI and block OCR utilities from inventory collection"
+git commit -m "fix: add delete btn to ready scans, block utility OCR from inventory"
 git push
