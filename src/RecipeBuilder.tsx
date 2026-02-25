@@ -8,28 +8,53 @@ import { InventoryPicker, type InventoryPickerItem } from './Inventory';
 const RECIPE_UNITS = ['גרם', 'ק"ג', 'מ"ל', 'ליטר', 'יחידה', 'כוס', 'כף', 'כפית'];
 
 /**
+ * Strip all types of quotes and apostrophes from a string for reliable matching.
+ */
+function stripQuotes(s: string): string {
+    return s.replace(/["״׳'`'"]/g, '').trim();
+}
+
+/**
  * Try to extract quantity + unit from an item name.
  * e.g. "טבעות בצל (10 ק"ג)" → { qty: 10, unit: 'ק"ג' }
- * e.g. "חלב 1 ליטר" → { qty: 1, unit: 'ליטר' }
+ * e.g. "ביצים 12 יח / ל" → { qty: 12, unit: 'יחידה' }
  */
 function parseQtyFromName(name: string): { qty: number; unit: string } | null {
-    // Match patterns like "10 ק"ג", "1 ליטר", "500 גרם", "250 מ"ל"
-    const patterns = [
-        /(\d+(?:\.\d+)?)\s*(?:ק"ג|קג|ק״ג)/,
-        /(\d+(?:\.\d+)?)\s*(?:גרם|גר'|גר)/,
-        /(\d+(?:\.\d+)?)\s*(?:ליטר|ל'|ל)/,
-        /(\d+(?:\.\d+)?)\s*(?:מ"ל|מל|מ״ל)/,
-        /(\d+(?:\.\d+)?)\s*(?:יח'|יחידה|יחידות|יח)/,
-    ];
-    const unitMap = ['ק"ג', 'גרם', 'ליטר', 'מ"ל', 'יחידה'];
+    // Normalize all quote variants before matching
+    const normalized = stripQuotes(name);
 
-    for (let i = 0; i < patterns.length; i++) {
-        const match = name.match(patterns[i]);
+    // Try each pattern against the normalized name
+    const patterns: [RegExp, string][] = [
+        [/(\d+(?:\.\d+)?)\s*קג/, 'ק"ג'],
+        [/(\d+(?:\.\d+)?)\s*(?:גרם|גר)/, 'גרם'],
+        [/(\d+(?:\.\d+)?)\s*(?:ליטר)/, 'ליטר'],
+        [/(\d+(?:\.\d+)?)\s*(?:מל)/, 'מ"ל'],
+        [/(\d+(?:\.\d+)?)\s*(?:יחידות|יחידה|יח)/, 'יחידה'],
+    ];
+
+    for (const [pattern, unit] of patterns) {
+        const match = normalized.match(pattern);
         if (match) {
-            return { qty: parseFloat(match[1]), unit: unitMap[i] };
+            return { qty: parseFloat(match[1]), unit };
         }
     }
     return null;
+}
+
+/**
+ * Normalize a unit string for comparison: strip all quotes/apostrophes.
+ */
+function normalizeUnit(unit: string): string {
+    return stripQuotes(unit);
+}
+
+/**
+ * Check if a unit is a "generic" container unit (not weight/volume).
+ * These units trigger name-parsing to find actual weight/volume.
+ */
+function isGenericUnit(unit: string): boolean {
+    const generic = ['יחידה', 'יח', 'קופסה', 'שקית', 'חבילה', 'בקבוק', 'כוס'];
+    return generic.includes(normalizeUnit(unit));
 }
 
 /**
@@ -37,7 +62,7 @@ function parseQtyFromName(name: string): { qty: number; unit: string } | null {
  * Returns the value in the same "family" base unit so we can compare apples to apples.
  */
 function toBaseUnit(qty: number, unit: string): { value: number; family: string } {
-    const u = unit.replace(/"/g, '').replace(/״/g, '').trim();
+    const u = normalizeUnit(unit);
     switch (u) {
         case 'קג':
             return { value: qty * 1000, family: 'weight' };
@@ -144,10 +169,11 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
             let invUnit = fromInventory.unit || 'יחידה';
             let invQty = fromInventory.quantity;
 
-            // If inventory unit is "יחידה", try to extract actual weight/volume from the item name
+            // If inventory unit is generic (יחידה, קופסה, שקית etc.),
+            // try to extract actual weight/volume from the item name
             // e.g. "טבעות בצל (10 ק"ג)" → invQty=10, invUnit='ק"ג'
-            const normalizedUnit = invUnit.replace(/"/g, '').replace(/״/g, '').trim();
-            if (normalizedUnit === 'יחידה' || normalizedUnit === 'יח' || normalizedUnit === 'קופסה' || normalizedUnit === 'שקית' || normalizedUnit === 'חבילה') {
+            // e.g. "ביצים 12 יח / ל" → invQty=12, invUnit='יחידה'
+            if (isGenericUnit(invUnit)) {
                 const parsed = parseQtyFromName(fromInventory.name);
                 if (parsed) {
                     invQty = parsed.qty;
@@ -158,7 +184,7 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
             // Smart defaults: kg→100g, liters→100ml, otherwise 1 unit
             let defaultUsedQty = 1;
             let defaultUsedUnit = invUnit;
-            const normUnit = invUnit.replace(/"/g, '').replace(/״/g, '').trim();
+            const normUnit = normalizeUnit(invUnit);
             if (normUnit === 'קג') {
                 defaultUsedQty = 100;
                 defaultUsedUnit = 'גרם';
