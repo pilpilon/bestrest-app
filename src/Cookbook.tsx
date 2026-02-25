@@ -276,9 +276,17 @@ export function Cookbook() {
                                     <div className="text-xs text-[var(--color-text-muted)]">
                                         {recipe.ingredientsCount} מרכיבים
                                     </div>
-                                    <div className={`px-2.5 py-1 rounded-lg flex flex-col items-center ${statusBg}`}>
-                                        <span className="text-[8px] uppercase tracking-wider font-bold text-[var(--color-text-muted)] opacity-80">Food Cost</span>
+                                    <div className={`px-2.5 py-1 rounded-lg flex flex-col items-center group/tooltip relative ${statusBg}`}>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-[8px] uppercase tracking-wider font-bold text-[var(--color-text-muted)] opacity-80">Food Cost</span>
+                                            <Info className="w-2.5 h-2.5 text-[var(--color-text-muted)] cursor-help" />
+                                        </div>
                                         <span className={`font-black text-sm ${statusColor}`}>{foodCostPercent.toFixed(1)}%</span>
+                                        {/* Tooltip Content */}
+                                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-black/95 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all shadow-xl border border-white/10 z-10 font-medium pointer-events-none text-right">
+                                            Food Cost הוא אחוז עלות חומרי הגלם מתוך מחיר המכירה. ככל שהאחוז נמוך יותר, המנה רווחית יותר. (יעד מומלץ: 25%-35%)
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/95"></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { ChevronRight, Save, Utensils, Beaker, Plus, X, Camera, Loader2 } from 'lucide-react';
+import { ChevronRight, Save, Utensils, Beaker, Plus, X, Camera, Loader2, Info } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { InventoryPicker, type InventoryPickerItem } from './Inventory';
 
@@ -257,11 +257,19 @@ export function RecipeBuilder({ initialData, onBack, onSave }: RecipeBuilderProp
                                 <span className="font-bold text-white">₪{calculatedCost.toFixed(2)}</span>
                             </div>
                             <div className="h-8 w-px bg-white/10"></div>
-                            <div className="text-right">
-                                <span className="text-[10px] text-[var(--color-text-muted)] block">Food Cost</span>
+                            <div className="text-right flex flex-col items-start relative group/tooltip">
+                                <span className="text-[10px] text-[var(--color-text-muted)] flex items-center gap-1 cursor-help">
+                                    Food Cost
+                                    <Info className="w-3 h-3 text-[var(--color-text-muted)]" />
+                                </span>
                                 <span className={`font-black ${foodCostPercent > 30 ? 'text-[var(--color-danger)]' : 'text-[var(--color-primary)]'}`}>
                                     {target > 0 ? foodCostPercent.toFixed(1) : 0}%
                                 </span>
+                                {/* Tooltip Content */}
+                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-black/95 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all shadow-xl border border-white/10 z-10 font-medium pointer-events-none text-right">
+                                    Food Cost הוא אחוז עלות חומרי הגלם מתוך מחיר המכירה. ככל שהאחוז נמוך יותר, המנה רווחית יותר. (יעד מומלץ: 25%-35%)
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-black/95"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
