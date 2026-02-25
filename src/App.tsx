@@ -270,10 +270,23 @@ function Dashboard() {
       // Categories that should NOT be tracked in inventory
       const EXCLUDED_INVENTORY_CATEGORIES = ['חשמל / מים / גז', 'שכירות', 'עובדים', 'תחזוקה', 'חשבונות'];
 
+      const EXCLUDE_KEYWORDS = [
+        'חשמל', 'פזגז', 'סופרגז', 'אמישראגז', 'גז עמר', 'שכירות', 'ארנונה',
+        'עיריית', 'תאגיד מים', 'מי אביבים', 'הגיחון', 'מי כרמל', 'מי שבע',
+        'משכורת', 'ביטוח', 'רואה חשבון', 'מס הכנסה', 'מע"מ', 'תקשורת', 'אינטרנט', 'בזק', 'הוט', 'פרטנר', 'סלקום', 'פלאפון'
+      ];
+
+      const supplierName = (finalData.supplier || '').toLowerCase();
+      const catName = (finalData.category || '').toLowerCase();
+      const shouldExcludeByKeyword = EXCLUDE_KEYWORDS.some(kw => supplierName.includes(kw) || catName.includes(kw));
+
       // Save line items to inventory collection
-      if (finalData.lineItems && finalData.lineItems.length > 0 && !EXCLUDED_INVENTORY_CATEGORIES.includes(finalData.category)) {
+      if (finalData.lineItems && finalData.lineItems.length > 0 && !EXCLUDED_INVENTORY_CATEGORIES.includes(finalData.category) && !shouldExcludeByKeyword) {
         for (const item of finalData.lineItems) {
           if (!item.name || !item.pricePerUnit) continue;
+
+          const itemNameLower = item.name.toLowerCase();
+          if (EXCLUDE_KEYWORDS.some(kw => itemNameLower.includes(kw))) continue;
 
           // Use canonical name as the document key. Replace spaces and slashes (which break Firestore paths).
           const itemId = item.name.trim().replace(/[\s/\\.]+/g, '_').toLowerCase();

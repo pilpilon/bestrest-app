@@ -346,8 +346,19 @@ export function Inventory() {
         setTimeout(() => setNotification(null), 4000);
     }, []);
 
-    const EXCLUDED = ['חשמל / מים / גז', 'שכירות', 'עובדים', 'חשבונות'];
-    const validItems = items.filter(i => !EXCLUDED.includes(i.category) && !EXCLUDED.some(ex => i.name.includes(ex)));
+    const EXCLUDED_CATEGORIES = ['חשמל / מים / גז', 'שכירות', 'עובדים', 'חשבונות'];
+    const EXCLUDED_KEYWORDS = [
+        'חשמל', 'פזגז', 'סופרגז', 'אמישראגז', 'גז עמר', 'שכירות', 'ארנונה',
+        'עיריית', 'תאגיד מים', 'מי אביבים', 'הגיחון', 'מי כרמל', 'מי שבע',
+        'משכורת', 'ביטוח', 'רואה חשבון', 'מס הכנסה', 'מע"מ'
+    ];
+
+    const validItems = items.filter(i => {
+        if (EXCLUDED_CATEGORIES.includes(i.category)) return false;
+        const name = i.name || '';
+        if (EXCLUDED_KEYWORDS.some(kw => name.includes(kw))) return false;
+        return true;
+    });
 
     // ── All categories (built from data + defaults) ─────────────────────────────
     const allCategories: string[] = Array.from(
@@ -398,48 +409,7 @@ export function Inventory() {
         }
     };
 
-    // ── Temporary Migration: Auto-categorize "כללי" based on name ────────────────
-    const handleRunMigration = async () => {
-        if (!businessId || !window.confirm('האם להריץ מיגרציית קטגוריות? פעולה זו תשייך מוצרים ב"כללי" לקטגוריות מתאימות אוטומטית לפי שמם.')) return;
 
-        try {
-            const RULES = [
-                { cat: 'שתייה', keywords: ['קולה', 'זירו', 'ספרייט', 'פאנטה', 'מיץ', 'מים', 'נביעות', 'סודה', 'טרופית', 'פיוז טי', 'משקה', 'נסטי', 'קינלי', 'שוופס'] },
-                { cat: 'אלכוהול', keywords: ['בירה', 'יין', 'וודקה', 'וויסקי', 'ערק', 'גולדסטאר', 'מכבי', 'היינקן', 'קורונה', 'סטלה', 'טובורג', 'קמפרי', 'רום', 'קברנה', 'מרלו'] },
-                { cat: 'ציוד', keywords: ['כוס', 'צלחת', 'מזלג', 'סכין', 'כף', 'כפיות', 'מפית', 'מפה', 'קופסה', 'שקית', 'נייר', 'רדיד', 'ניילון', 'מגבון', 'קש', 'תבנית'] },
-                { cat: 'תחזוקה', keywords: ['אקונומיקה', 'סבון', 'נוזל', 'מסיר', 'מטאטא', 'מגב', 'סמרטוט', 'כפפות', 'פח', 'ניקוי', 'חומר', 'מרכך', 'מנקה', 'אשפה'] },
-                { cat: 'חומרי גלם', keywords: ['עגבני', 'מלפפון', 'בצל', 'שום', 'חסה', 'תפוח', 'תפוז', 'לימון', 'גזר', 'פלפל', 'כרוב', 'פטרוזיליה', 'כוסברה', 'נענע', 'פטרי', 'בשר', 'עוף', 'בקר', 'אנטריקוט', 'המבורגר', 'חזה', 'שוק', 'דג', 'סלמון', 'לחמני', 'פית', 'לחם', 'קמח', 'שמן', 'סוכר', 'מלח', 'פפריקה', 'כמון', 'תבלין', 'רוטב', 'קטשופ', 'מיונז', 'חרדל', 'טריאקי', 'סויה', 'צ\'ילי', 'חלב', 'גבינ', 'חמאה', 'שמנת', 'ביצ', 'טופו', 'אורז', 'פסטה', 'פתיתים', 'צ\'יפס', 'זיתים', 'שימורים', 'רסק'] }
-            ];
-
-            let updated = 0;
-            const itemsToCheck = items.filter(i => !i.category || i.category === 'כללי');
-
-            for (const item of itemsToCheck) {
-                const lowerName = (item.name || '').toLowerCase();
-                let newCat = null;
-
-                for (const rule of RULES) {
-                    for (const kw of rule.keywords) {
-                        if (lowerName.includes(kw)) {
-                            newCat = rule.cat;
-                            break;
-                        }
-                    }
-                    if (newCat) break;
-                }
-
-                if (newCat) {
-                    const refDoc = doc(db, 'businesses', businessId, 'inventory', item.id);
-                    await setDoc(refDoc, { category: newCat }, { merge: true });
-                    updated++;
-                }
-            }
-            notify('success', `מיגרציה הושלמה! עודכנו ${updated} מוצרים.`);
-        } catch (err) {
-            console.error(err);
-            notify('error', 'שגיאה במיגרציה');
-        }
-    };
     // ── Delete item ─────────────────────────────────────────────────────────────
     const handleDelete = async (item: InventoryItem) => {
         if (!businessId) return;
@@ -703,46 +673,6 @@ export function Inventory() {
                     </div>
                 </>
             )}
-
-            {/* Low Stock Summary */}
-            {lowStockCount > 0 && activeCategory === 'הכל' && !search && (
-                <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-4">
-                    <h3 className="text-sm font-bold text-red-400 flex items-center gap-2 mb-3">
-                        <AlertTriangle className="w-4 h-4" />
-                        דורשים חידוש מלאי ({lowStockCount})
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                        {validItems
-                            .filter(i => i.quantity <= (i.minStock ?? 1))
-                            .map(i => (
-                                <button
-                                    key={i.id}
-                                    onClick={() => { setEditingItem(i); setShowModal(true); }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl text-xs font-bold text-red-400 transition-colors"
-                                >
-                                    <Edit3 className="w-3 h-3" />
-                                    {i.name} ({i.quantity} {i.unit})
-                                </button>
-                            ))
-                        }
-                    </div>
-                </div>
-            )}
-
-            {/* Secret Migration Button For Admin/User to fix categories instantly in production */}
-            {items.some(i => i.category === 'כללי' || !i.category) && (
-                <div className="mt-8 mb-4 flex justify-center opacity-30 hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={handleRunMigration}
-                        className="text-[10px] bg-slate-800 text-slate-400 px-3 py-1 rounded-full flex items-center gap-1 border border-slate-700 hover:border-slate-500"
-                        title="הפעלת מיגרציה אוטומטית לסידור קטגוריות"
-                    >
-                        <Tag className="w-3 h-3" />
-                        סידור קטגוריות אוטומטי (מיגרציה)
-                    </button>
-                </div>
-            )}
-
             {/* Item Modal */}
             {showModal && (
                 <ItemModal
