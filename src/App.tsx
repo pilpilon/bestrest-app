@@ -255,6 +255,40 @@ function Dashboard() {
     fileInputRef.current?.click();
   };
 
+  // Local keyword-based category classifier (no tokens, zero cost)
+  const classifyItemCategory = (itemName: string, invoiceCategory: string): string => {
+    const name = itemName.toLowerCase();
+
+    // If the invoice overall category is already specific (not general), inherit it
+    if (invoiceCategory && invoiceCategory !== 'כללי' && invoiceCategory !== 'general') {
+      return invoiceCategory;
+    }
+
+    const CATEGORY_KEYWORDS: { category: string; keywords: string[] }[] = [
+      { category: 'שתייה', keywords: ['קולה', 'ספרייט', 'מיץ', 'מים', 'נביעות', 'תאי', 'טרה שתיה', 'רד בול', 'מנגו', 'נקטר', 'עלית שתיה'] },
+      { category: 'אלכוהול', keywords: ['בירה', 'יין', 'וודקה', 'וויסקי', 'ערק', 'קמפרי', 'ג\'ין', 'רום', 'שמפניה', 'ליקר', 'אלכוהול'] },
+      { category: 'ציוד', keywords: ['סכין', 'קרש', 'סיר', 'נייר', 'שקית', 'כפפה', 'מגב', 'מנקה', 'אריזה', 'כלי', 'מגש', 'סרט', 'ניקיון'] },
+      { category: 'תחזוקה', keywords: ['תיקון', 'חלק חילוף', 'שמן מכונה', 'גז בישול', 'נייר כסף', 'ניקוי'] },
+      {
+        category: 'חומרי גלם', keywords: [
+          'בשר', 'עוף', 'הודו', 'דג', 'סלמון', 'טונה', 'ירק', 'עגבניה', 'מלפפון', 'חסה', 'גבינה',
+          'חלב', 'שמנת', 'ביצ', 'קמח', 'שמן', 'סוכר', 'מלח', 'פלפל', 'תבלין', 'רוטב', 'קטשופ',
+          'מיונז', 'חמאה', 'שוקולד', 'לחם', 'פיתה', 'בצל', 'שום', 'תפוח', 'תפוז', 'לימון',
+          'גזר', 'תפו\"א', 'תפוד', "צ'יפס", 'פסטה', 'אורז', 'קינוח', 'עוגה', 'המבורגר', 'שניצל',
+          'פסטרמה', 'נקניק', 'סלמי', 'טחינה', 'חומוס', 'זית', 'פסטו'
+        ]
+      },
+    ];
+
+    for (const { category, keywords } of CATEGORY_KEYWORDS) {
+      if (keywords.some(kw => name.includes(kw))) {
+        return category;
+      }
+    }
+
+    return 'חומרי גלם'; // default for food invoices
+  };
+
   const saveExpense = async (finalData: any) => {
     if (!user || !businessId) return;
     setIsSaving(true);
@@ -292,7 +326,7 @@ function Dashboard() {
           const itemId = item.name.trim().replace(/[\s/\\.]+/g, '_').toLowerCase();
           const itemRef = doc(db, 'businesses', businessId, 'inventory', itemId);
 
-          // Read existing to capture previousPrice and existing aliases
+          // Read existing to capture previousPrice, existing aliases and current quantity
           const existingSnap = await getDoc(itemRef);
           const existingData = existingSnap.exists() ? existingSnap.data() : null;
 
@@ -304,19 +338,32 @@ function Dashboard() {
             ...(rawName !== item.name ? [rawName.trim().toLowerCase()] : [])
           ]));
 
+          // ACCUMULATE quantity: existing stock + new delivery
+          const incomingQty = Number(item.quantity) || 1;
+          const existingQty = Number(existingData?.quantity) || 0;
+          const newQuantity = existingQty + incomingQty;
+
+          // Assign category: keep existing if set, otherwise use local keyword classifier
+          const existingCategory = existingData?.category;
+          const assignedCategory = existingCategory && existingCategory !== 'כללי'
+            ? existingCategory
+            : classifyItemCategory(item.name, finalData.category);
+
           await setDoc(itemRef, {
             name: item.name,
             aliases: newAliases,
+            category: assignedCategory,
             lastPrice: item.pricePerUnit,
             previousPrice: existingData?.lastPrice || item.pricePerUnit,
-            unit: item.unit || 'unit',
+            unit: item.unit || "יח'",
             supplier: finalData.supplier || '',
             lastDate: finalData.date || new Date().toLocaleDateString('he-IL'),
-            quantity: item.quantity || 1,
+            quantity: newQuantity,
             updatedAt: serverTimestamp(),
           }, { merge: true });
         }
       }
+
 
       setIsReviewing(false);
       setOcrResult(null);
