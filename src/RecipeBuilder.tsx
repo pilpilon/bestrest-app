@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { ChevronRight, Save, Utensils, Beaker, Plus, X, Camera, Loader2, Info } from 'lucide-react';
+import { ChevronRight, Save, Utensils, Beaker, Plus, X, Camera, Loader2, Info, Trash2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { InventoryPicker, type InventoryPickerItem } from './Inventory';
 
@@ -26,9 +26,10 @@ interface RecipeBuilderProps {
     initialData?: Recipe | null;
     onBack: () => void;
     onSave: (recipe: any) => Promise<void>;
+    onDelete?: (id: string) => Promise<void>;
 }
 
-export function RecipeBuilder({ initialData, onBack, onSave }: RecipeBuilderProps) {
+export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeBuilderProps) {
     const { businessId } = useAuth();
     const [name, setName] = useState(initialData?.name || '');
     const [targetPrice, setTargetPrice] = useState(initialData?.targetPrice?.toString() || '');
@@ -162,14 +163,25 @@ export function RecipeBuilder({ initialData, onBack, onSave }: RecipeBuilderProp
                     <Utensils className="w-6 h-6 text-[var(--color-primary)]" />
                     {initialData ? 'עריכת מנה' : 'בניית מנה חדשה'}
                 </h2>
-                <button
-                    onClick={handleSave}
-                    disabled={isSaving || !name || !targetPrice}
-                    className="bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/30 hover:bg-[var(--color-primary)]/20 px-6 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
-                >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    שמור מנה
-                </button>
+                <div className="flex items-center gap-2">
+                    {initialData && onDelete && (
+                        <button
+                            onClick={() => onDelete(initialData.id)}
+                            className="bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20 px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="hidden sm:inline">מחק מנה</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving || !name || !targetPrice}
+                        className="bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/30 hover:bg-[var(--color-primary)]/20 px-6 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
+                    >
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        <span className="hidden sm:inline">שמור מנה</span>
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-6">

@@ -58,10 +58,16 @@ export function Cookbook() {
         }
     };
 
-    const handleDeleteRecipe = async (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
+    const handleDeleteRecipe = async (e: React.MouseEvent | undefined, id: string) => {
+        if (e) e.stopPropagation();
         if (!businessId || !window.confirm('האם אתה בטוח שברצונך למחוק מתכון זה?')) return;
+
         await deleteDoc(doc(db, 'businesses', businessId, 'recipes', id));
+
+        if (editingRecipe?.id === id) {
+            setEditingRecipe(null);
+            setIsBuilding(false);
+        }
     };
 
     const handleBulkMenuScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,6 +132,7 @@ export function Cookbook() {
                 initialData={editingRecipe}
                 onBack={() => { setIsBuilding(false); setEditingRecipe(null); }}
                 onSave={handleSaveRecipe}
+                onDelete={(id) => handleDeleteRecipe(undefined, id)}
             />
         );
     }
@@ -250,7 +257,7 @@ export function Cookbook() {
                         >
                             <button
                                 onClick={(e) => handleDeleteRecipe(e, recipe.id)}
-                                className="absolute top-4 left-4 p-2 rounded-lg bg-red-500/10 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20"
+                                className="absolute top-4 left-4 p-2 rounded-lg bg-red-500/10 text-red-400 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-red-500/20"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
