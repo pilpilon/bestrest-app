@@ -41,6 +41,13 @@ const DEFAULT_CATEGORIES = [
     'חומרי גלם', 'שתייה', 'אלכוהול', 'ציוד', 'תחזוקה', 'כללי',
 ];
 
+export const EXCLUDED_CATEGORIES = ['חשמל / מים / גז', 'שכירות', 'עובדים', 'חשבונות'];
+export const EXCLUDED_KEYWORDS = [
+    'חשמל', 'פזגז', 'סופרגז', 'אמישראגז', 'גז עמר', 'שכירות', 'ארנונה',
+    'עיריית', 'תאגיד מים', 'מי אביבים', 'הגיחון', 'מי כרמל', 'מי שבע',
+    'משכורת', 'ביטוח', 'רואה חשבון', 'מס הכנסה', 'מע"מ'
+];
+
 const CATEGORY_COLORS: Record<string, string> = {
     'חומרי גלם': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     'שתייה': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
@@ -362,13 +369,6 @@ export function Inventory() {
         setNotification({ type, message });
         setTimeout(() => setNotification(null), 4000);
     }, []);
-
-    const EXCLUDED_CATEGORIES = ['חשמל / מים / גז', 'שכירות', 'עובדים', 'חשבונות'];
-    const EXCLUDED_KEYWORDS = [
-        'חשמל', 'פזגז', 'סופרגז', 'אמישראגז', 'גז עמר', 'שכירות', 'ארנונה',
-        'עיריית', 'תאגיד מים', 'מי אביבים', 'הגיחון', 'מי כרמל', 'מי שבע',
-        'משכורת', 'ביטוח', 'רואה חשבון', 'מס הכנסה', 'מע"מ'
-    ];
 
     const validItems = items.filter(i => {
         if (EXCLUDED_CATEGORIES.includes(i.category)) return false;
@@ -865,10 +865,17 @@ export function InventoryPicker({
         if (!businessId) return;
         const ref = collection(db, 'businesses', businessId, 'inventory');
         const unsub = onSnapshot(ref, snap => {
-            setAllItems(snap.docs.map(d => {
+            const fetched = snap.docs.map(d => {
                 const data = d.data();
-                return { id: d.id, name: data.name, unit: data.unit || 'יחידה', quantity: data.quantity || 0, lastPrice: data.lastPrice || 0 };
-            }));
+                return { id: d.id, name: data.name, category: data.category, unit: data.unit || 'יחידה', quantity: data.quantity || 0, lastPrice: data.lastPrice || 0 };
+            });
+            const valid = fetched.filter(i => {
+                if (i.category && EXCLUDED_CATEGORIES.includes(i.category)) return false;
+                const name = i.name || '';
+                if (EXCLUDED_KEYWORDS.some(kw => name.includes(kw))) return false;
+                return true;
+            });
+            setAllItems(valid);
         });
         return () => unsub();
     }, [businessId]);
