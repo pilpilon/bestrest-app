@@ -8,21 +8,44 @@ import { InventoryPicker, type InventoryPickerItem } from './Inventory';
 const RECIPE_UNITS = ['גרם', 'ק"ג', 'מ"ל', 'ליטר', 'יחידה', 'כוס', 'כף', 'כפית'];
 
 /**
+ * Try to extract quantity + unit from an item name.
+ * e.g. "טבעות בצל (10 ק"ג)" → { qty: 10, unit: 'ק"ג' }
+ * e.g. "חלב 1 ליטר" → { qty: 1, unit: 'ליטר' }
+ */
+function parseQtyFromName(name: string): { qty: number; unit: string } | null {
+    // Match patterns like "10 ק"ג", "1 ליטר", "500 גרם", "250 מ"ל"
+    const patterns = [
+        /(\d+(?:\.\d+)?)\s*(?:ק"ג|קג|ק״ג)/,
+        /(\d+(?:\.\d+)?)\s*(?:גרם|גר'|גר)/,
+        /(\d+(?:\.\d+)?)\s*(?:ליטר|ל'|ל)/,
+        /(\d+(?:\.\d+)?)\s*(?:מ"ל|מל|מ״ל)/,
+        /(\d+(?:\.\d+)?)\s*(?:יח'|יחידה|יחידות|יח)/,
+    ];
+    const unitMap = ['ק"ג', 'גרם', 'ליטר', 'מ"ל', 'יחידה'];
+
+    for (let i = 0; i < patterns.length; i++) {
+        const match = name.match(patterns[i]);
+        if (match) {
+            return { qty: parseFloat(match[1]), unit: unitMap[i] };
+        }
+    }
+    return null;
+}
+
+/**
  * Convert a quantity from one unit to a base unit (grams / ml / units).
  * Returns the value in the same "family" base unit so we can compare apples to apples.
  */
 function toBaseUnit(qty: number, unit: string): { value: number; family: string } {
-    const u = unit.replace(/"/g, '').trim();
+    const u = unit.replace(/"/g, '').replace(/״/g, '').trim();
     switch (u) {
         case 'קג':
-        case 'ק"ג':
             return { value: qty * 1000, family: 'weight' };
         case 'גרם':
             return { value: qty, family: 'weight' };
         case 'ליטר':
             return { value: qty * 1000, family: 'volume' };
         case 'מל':
-        case 'מ"ל':
             return { value: qty, family: 'volume' };
         default:
             return { value: qty, family: 'unit' };
@@ -32,6 +55,7 @@ function toBaseUnit(qty: number, unit: string): { value: number; family: string 
 /**
  * Calculate the proportional cost:
  *   (usedQty converted to base) / (inventoryQty converted to base) × price
+ * If unit families don't match, returns 0 (cannot calculate).
  */
 function calcProportionalCost(
     usedQty: number,
@@ -43,7 +67,8 @@ function calcProportionalCost(
     if (!usedQty || !invQty || !totalPrice) return 0;
     const used = toBaseUnit(usedQty, usedUnit);
     const inv = toBaseUnit(invQty, invUnit);
-    // If families don't match (e.g. grams vs units), fallback to simple ratio
+    // If families don't match, we can't calculate → return 0
+    if (used.family !== inv.family) return 0;
     const ratio = used.value / inv.value;
     return Math.round(ratio * totalPrice * 100) / 100;
 }
@@ -116,22 +141,35 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
     const addIngredient = (fromInventory?: InventoryPickerItem) => {
         if (fromInventory) {
             const id = Date.now().toString();
-            // Default used quantity: if inventory is in kg, default to 100g; if liters, 100ml; otherwise 1 unit
-            const invUnit = fromInventory.unit || 'יחידה';
+            let invUnit = fromInventory.unit || 'יחידה';
+            let invQty = fromInventory.quantity;
+
+            // If inventory unit is "יחידה", try to extract actual weight/volume from the item name
+            // e.g. "טבעות בצל (10 ק"ג)" → invQty=10, invUnit='ק"ג'
+            const normalizedUnit = invUnit.replace(/"/g, '').replace(/״/g, '').trim();
+            if (normalizedUnit === 'יחידה' || normalizedUnit === 'יח' || normalizedUnit === 'קופסה' || normalizedUnit === 'שקית' || normalizedUnit === 'חבילה') {
+                const parsed = parseQtyFromName(fromInventory.name);
+                if (parsed) {
+                    invQty = parsed.qty;
+                    invUnit = parsed.unit;
+                }
+            }
+
+            // Smart defaults: kg→100g, liters→100ml, otherwise 1 unit
             let defaultUsedQty = 1;
             let defaultUsedUnit = invUnit;
-            const normalizedUnit = invUnit.replace(/"/g, '').trim();
-            if (normalizedUnit === 'קג' || normalizedUnit === 'ק"ג') {
+            const normUnit = invUnit.replace(/"/g, '').replace(/״/g, '').trim();
+            if (normUnit === 'קג') {
                 defaultUsedQty = 100;
                 defaultUsedUnit = 'גרם';
-            } else if (normalizedUnit === 'ליטר') {
+            } else if (normUnit === 'ליטר') {
                 defaultUsedQty = 100;
                 defaultUsedUnit = 'מ"ל';
             }
 
             const cost = calcProportionalCost(
                 defaultUsedQty, defaultUsedUnit,
-                fromInventory.quantity, invUnit,
+                invQty, invUnit,
                 fromInventory.lastPrice
             );
 
@@ -143,7 +181,7 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
                 source: 'inventory' as const,
                 usedQuantity: defaultUsedQty,
                 usedUnit: defaultUsedUnit,
-                inventoryQuantity: fromInventory.quantity,
+                inventoryQuantity: invQty,
                 inventoryUnit: invUnit,
                 inventoryPrice: fromInventory.lastPrice,
             }]);
