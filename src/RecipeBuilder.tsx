@@ -166,8 +166,13 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
                 <div className="flex items-center gap-2">
                     {initialData && onDelete && (
                         <button
-                            onClick={() => onDelete(initialData.id)}
-                            className="bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20 px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors"
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onDelete(initialData.id);
+                            }}
+                            className="bg-red-500/10 text-red-500 border border-red-500/30 hover:bg-red-500/20 px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors relative z-10"
                         >
                             <Trash2 className="w-4 h-4" />
                             <span className="hidden sm:inline">מחק מנה</span>
