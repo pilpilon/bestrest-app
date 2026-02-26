@@ -171,21 +171,15 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
             // The actual stock count (e.g. 150 units in the warehouse)
             const actualStockQty = fromInventory.quantity;
 
-            // invQty is the "package size" used for proportional cost calculation.
-            // For weight/volume units (ק"ג, ליטר etc.) it equals actualStockQty.
-            // For generic units (יחידה, שקית, קופסה etc.) we try to parse a
-            // package-size from the item name (e.g. "לחמניות 30 יח'" → 30 per pack),
-            // so that the price-per-unit is correct.  The actual stock count is kept
-            // separately and shown to the user for reference only.
-            let invQty = actualStockQty;
+            // invQty is the "reference quantity" used for cost calculation.
+            // Since inventory prices are "per unit", the default is 1.
+            let invQty = 1;
 
             if (isGenericUnit(invUnit)) {
                 const parsed = parseQtyFromName(fromInventory.name);
                 if (parsed && parsed.unit !== 'יחידה') {
                     // Only override when name reveals a real weight/volume,
                     // e.g. "טבעות בצל (10 ק"ג)" → treat as 10 ק"ג per unit.
-                    // If the name just says "30 יח'" the unit is already יחידה
-                    // and the price is already per-unit — no override needed.
                     invQty = parsed.qty;
                     invUnit = parsed.unit;
                 }
