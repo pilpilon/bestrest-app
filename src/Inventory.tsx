@@ -1009,7 +1009,7 @@ export function InventoryPicker({
             />
 
             {isOpen && results.length > 0 && (
-                <div className="absolute top-full right-0 left-0 mt-1 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-[60] overflow-y-auto max-h-60 animate-in fade-in slide-in-from-top-2 duration-150 scrollbar-hide">
+                <div className="absolute bottom-full right-0 left-0 mb-1 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-[60] overflow-y-auto max-h-60 animate-in fade-in slide-in-from-bottom-2 duration-150 scrollbar-hide">
                     {results.length > 0 ? (
                         <>
                             <div className="px-3 py-2 border-b border-white/5">
