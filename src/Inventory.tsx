@@ -244,10 +244,16 @@ function ProductCard({
     item,
     onEdit,
     onDelete,
+    onLongPress,
+    isMergeSource,
+    isMergeMode,
 }: {
     item: InventoryItem;
     onEdit: (item: InventoryItem) => void;
     onDelete: (item: InventoryItem) => void;
+    onLongPress?: (item: InventoryItem) => void;
+    isMergeSource?: boolean;
+    isMergeMode?: boolean;
 }) {
     const minStock = item.minStock ?? 1;
     const isLowStock = item.quantity <= minStock;
@@ -257,10 +263,44 @@ function ProductCard({
     const catColor = getCategoryColor(item.category);
     const dotColor = getCategoryDot(item.category);
 
+    // Long press detection
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const startPress = () => {
+        if (!onLongPress) return;
+        timerRef.current = setTimeout(() => {
+            onLongPress(item);
+        }, 600); // 600ms for long press
+    };
+
+    const cancelPress = () => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (onLongPress) onLongPress(item);
+    };
+
     return (
         <div
-            className={`relative bg-white/5 backdrop-blur-md border rounded-2xl p-4 transition-all active:scale-[0.97] cursor-pointer ${isLowStock ? 'border-red-500/40' : 'border-white/10'}`}
+            className={`relative bg-white/5 backdrop-blur-md border rounded-2xl p-4 transition-all active:scale-[0.97] cursor-pointer ${isMergeSource
+                ? 'ring-2 ring-[var(--color-primary)] bg-[var(--color-primary)]/10 border-[var(--color-primary)] shadow-[0_0_15px_rgba(13,242,128,0.3)]'
+                : isMergeMode
+                    ? 'opacity-50 hover:opacity-100 hover:border-white/30'
+                    : isLowStock ? 'border-red-500/40' : 'border-white/10'
+                }`}
             onClick={() => onEdit(item)}
+            onTouchStart={startPress}
+            onTouchEnd={cancelPress}
+            onTouchMove={cancelPress}
+            onMouseDown={startPress}
+            onMouseUp={cancelPress}
+            onMouseLeave={cancelPress}
+            onContextMenu={handleContextMenu}
         >
             {/* Top row: category chip + delete button */}
             <div className="flex items-center justify-between mb-2">
@@ -345,6 +385,7 @@ export function Inventory() {
     const [importing, setImporting] = useState(false);
     const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [mergeTarget, setMergeTarget] = useState<{ keep: InventoryItem; remove: InventoryItem } | null>(null);
+    const [manualMergeSource, setManualMergeSource] = useState<InventoryItem | null>(null);
     const csvInputRef = useRef<HTMLInputElement>(null);
 
     // ── Ignored Duplicates State ────────────────────────────────────────────────
@@ -565,6 +606,29 @@ export function Inventory() {
                 </div>
             )}
 
+            {/* Manual Merge Mode Banner */}
+            {manualMergeSource && (
+                <div className="fixed top-20 left-4 right-4 z-[90] bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/40 rounded-2xl p-4 shadow-[0_0_20px_rgba(13,242,128,0.15)] flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-md animate-in slide-in-from-top-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[var(--color-primary)]/20 flex items-center justify-center animate-pulse">
+                            <GitMerge className="w-5 h-5 text-[var(--color-primary)]" />
+                        </div>
+                        <div>
+                            <p className="font-bold text-white text-sm">מצב מיזוג ידני</p>
+                            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                                בחר מוצר אחר כדי למזג את <strong className="text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-1 rounded">{manualMergeSource.name}</strong> לתוכו
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setManualMergeSource(null)}
+                        className="w-full md:w-auto px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold transition-colors"
+                    >
+                        ביטול
+                    </button>
+                </div>
+            )}
+
             {/* Page Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -736,7 +800,24 @@ export function Inventory() {
                                 <ProductCard
                                     key={item.id}
                                     item={item}
-                                    onEdit={(i) => { setEditingItem(i); setShowModal(true); }}
+                                    isMergeMode={!!manualMergeSource}
+                                    isMergeSource={manualMergeSource?.id === item.id}
+                                    onEdit={(clickedItem) => {
+                                        if (manualMergeSource) {
+                                            if (manualMergeSource.id === clickedItem.id) {
+                                                // Canceled by clicking the same item
+                                                setManualMergeSource(null);
+                                            } else {
+                                                // Trigger merge!
+                                                setMergeTarget({ keep: clickedItem, remove: manualMergeSource });
+                                                setManualMergeSource(null);
+                                            }
+                                        } else {
+                                            setEditingItem(clickedItem);
+                                            setShowModal(true);
+                                        }
+                                    }}
+                                    onLongPress={setManualMergeSource}
                                     onDelete={(i) => setDeleteConfirm(i.id)}
                                 />
                             )
@@ -928,7 +1009,7 @@ export function InventoryPicker({
             />
 
             {isOpen && results.length > 0 && (
-                <div className="absolute top-full right-0 left-0 mt-1 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-[60] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute top-full right-0 left-0 mt-1 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-[60] overflow-y-auto max-h-60 animate-in fade-in slide-in-from-top-2 duration-150 scrollbar-hide">
                     {results.length > 0 ? (
                         <>
                             <div className="px-3 py-2 border-b border-white/5">
