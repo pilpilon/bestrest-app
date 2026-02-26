@@ -151,7 +151,6 @@ ${expenses.map((exp: any, i: number) => `${i + 1}. ספק: ${exp.supplier} | ס�
       to: [accountantEmail],
       replyTo: userEmail, // Accountant can reply directly to the restaurant owner
       subject: `דוח חשבוניות - ${businessName || 'מסעדה'} - ${monthYear}`,
-      text: textContent,
       html: htmlContent,
       attachments: validAttachments.length > 0 ? validAttachments as any[] : undefined,
     });
