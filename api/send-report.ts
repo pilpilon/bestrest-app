@@ -34,8 +34,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     year: 'numeric',
   });
 
-  // Plain text fallback
-  let textContent = `דוח חשבוניות - BestRest
+  // Plain text body — sending text-only avoids MIME multipart issues
+  // that cause old accounting software (Rivhit etc.) to show the HTML as an extra attachment.
+  const textContent = `דוח חשבוניות - BestRest
 מסעדה: ${businessName || 'מסעדה'}
 חודש: ${monthYear}
 נשלח מ: ${userName || userEmail}
@@ -45,44 +46,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 פירוט:
 ${expenses.map((exp: any, i: number) => `${i + 1}. ספק: ${exp.supplier} | סכום: ₪${exp.total}`).join('\n')}
-`;
 
-  // HTML Template - fixes the Outlook bug where plain text becomes ATT00001.txt attachment
-  const htmlContent = `
-    <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-      <h2 style="color: #2563eb; margin-bottom: 20px;">דוח חשבוניות - BestRest</h2>
-      
-      <p>
-        <strong>מסעדה:</strong> ${businessName || 'מסעדה'}<br>
-        <strong>חודש:</strong> ${monthYear}<br>
-        <strong>נשלח מ:</strong> ${userName || userEmail}
-      </p>
-
-      <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <p style="margin: 0; font-size: 16px;">
-          <strong>סה"כ הוצאות לחודש:</strong> ${totalAmount.toLocaleString()} ש"ח<br>
-          <strong>כמות חשבוניות מצורפות:</strong> ${expenses.length} חשבוניות
-        </p>
-      </div>
-
-      <h3 style="margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px;">פירוט חשבוניות:</h3>
-      <ul style="list-style-type: none; padding-right: 0;">
-        ${expenses.map((exp: any, index: number) => `
-          <li style="margin-bottom: 15px; padding: 10px; border: 1px solid #e5e7eb; border-radius: 6px;">
-            <strong>${index + 1}. ספק: ${exp.supplier}</strong><br>
-            תאריך: ${exp.date} | קטגוריה: ${exp.category}<br>
-            סכום: <span style="color: #059669; font-weight: bold;">₪${(exp.total || 0).toLocaleString()}</span>
-          </li>
-        `).join('')}
-      </ul>
-
-      <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
-        הודעה זו מיועדת לרואה החשבון.<br>
-        החשבוניות מצורפות כקבצים למייל זה.<br><br>
-        נשלח אוטומטית באמצעות BestRest - מערכת ניהול הוצאות למסעדות.
-      </p>
-    </div>
-  `;
+נשלח אוטומטית באמצעות BestRest - מערכת ניהול הוצאות למסעדות.`;
 
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -151,7 +116,7 @@ ${expenses.map((exp: any, i: number) => `${i + 1}. ספק: ${exp.supplier} | ס�
       to: [accountantEmail],
       replyTo: userEmail, // Accountant can reply directly to the restaurant owner
       subject: `דוח חשבוניות - ${businessName || 'מסעדה'} - ${monthYear}`,
-      html: htmlContent,
+      text: textContent, // text-only: no MIME multipart, no phantom HTML attachment
       attachments: validAttachments.length > 0 ? validAttachments as any[] : undefined,
     });
 
