@@ -108,9 +108,10 @@ export interface Ingredient {
     // Quantity-aware fields
     usedQuantity?: number;
     usedUnit?: string;
-    inventoryQuantity?: number;
+    inventoryQuantity?: number;  // package size used for cost math
     inventoryUnit?: string;
     inventoryPrice?: number;
+    actualStockQty?: number;     // real units in the warehouse (display only)
 }
 
 export interface Recipe {
@@ -167,15 +168,24 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
         if (fromInventory) {
             const id = Date.now().toString();
             let invUnit = fromInventory.unit || 'יחידה';
-            let invQty = fromInventory.quantity;
+            // The actual stock count (e.g. 150 units in the warehouse)
+            const actualStockQty = fromInventory.quantity;
 
-            // If inventory unit is generic (יחידה, קופסה, שקית etc.),
-            // try to extract actual weight/volume from the item name
-            // e.g. "טבעות בצל (10 ק"ג)" → invQty=10, invUnit='ק"ג'
-            // e.g. "ביצים 12 יח / ל" → invQty=12, invUnit='יחידה'
+            // invQty is the "package size" used for proportional cost calculation.
+            // For weight/volume units (ק"ג, ליטר etc.) it equals actualStockQty.
+            // For generic units (יחידה, שקית, קופסה etc.) we try to parse a
+            // package-size from the item name (e.g. "לחמניות 30 יח'" → 30 per pack),
+            // so that the price-per-unit is correct.  The actual stock count is kept
+            // separately and shown to the user for reference only.
+            let invQty = actualStockQty;
+
             if (isGenericUnit(invUnit)) {
                 const parsed = parseQtyFromName(fromInventory.name);
-                if (parsed) {
+                if (parsed && parsed.unit !== 'יחידה') {
+                    // Only override when name reveals a real weight/volume,
+                    // e.g. "טבעות בצל (10 ק"ג)" → treat as 10 ק"ג per unit.
+                    // If the name just says "30 יח'" the unit is already יחידה
+                    // and the price is already per-unit — no override needed.
                     invQty = parsed.qty;
                     invUnit = parsed.unit;
                 }
@@ -207,9 +217,12 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
                 source: 'inventory' as const,
                 usedQuantity: defaultUsedQty,
                 usedUnit: defaultUsedUnit,
+                // inventoryQuantity = package size (used for cost math)
                 inventoryQuantity: invQty,
                 inventoryUnit: invUnit,
                 inventoryPrice: fromInventory.lastPrice,
+                // actual stock count shown to user as reference
+                actualStockQty,
             }]);
             return;
         }
@@ -493,7 +506,7 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
                                             {RECIPE_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                                         </select>
                                         <span className="text-[9px] text-[var(--color-text-muted)] flex-shrink-0">
-                                            (במלאי: {ing.inventoryQuantity} {ing.inventoryUnit} ב-₪{ing.inventoryPrice})
+                                            (במלאי: {ing.actualStockQty ?? ing.inventoryQuantity} {ing.inventoryUnit} ב-₪{ing.inventoryPrice})
                                         </span>
                                     </div>
                                 )}
