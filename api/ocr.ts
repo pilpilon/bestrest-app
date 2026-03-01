@@ -322,8 +322,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const token = authHeader.split('Bearer ')[1];
         await adminAuth.verifyIdToken(token);
-    } catch (error) {
-        return res.status(401).json({ error: 'Unauthorized: Token verification failed' });
+    } catch (error: any) {
+        console.error("Token verification error:", error);
+        return res.status(401).json({ error: 'Unauthorized: Token verification failed', details: error.message });
     }
 
     const { imageBase64, mimeType } = req.body;
