@@ -25,11 +25,11 @@ function parseQtyFromName(name: string): { qty: number; unit: string } | null {
 
     // Try each pattern against the normalized name
     const patterns: [RegExp, string][] = [
-        [/(\d+(?:\.\d+)?)\s*קג/, 'ק"ג'],
-        [/(\d+(?:\.\d+)?)\s*(?:גרם|גר)/, 'גרם'],
-        [/(\d+(?:\.\d+)?)\s*(?:ליטר)/, 'ליטר'],
-        [/(\d+(?:\.\d+)?)\s*(?:מל)/, 'מ"ל'],
-        [/(\d+(?:\.\d+)?)\s*(?:יחידות|יחידה|יח)/, 'יחידה'],
+        [/(\d+(?:\.\d+)?)\s*(?:קג|ק"ג|קילו|kg)/i, 'ק"ג'],
+        [/(\d+(?:\.\d+)?)\s*(?:גרם|גר'|גר|g)/i, 'גרם'],
+        [/(\d+(?:\.\d+)?)\s*(?:ליטר|l|L)/i, 'ליטר'],
+        [/(\d+(?:\.\d+)?)\s*(?:מל|מ"ל|ml)/i, 'מ"ל'],
+        [/(\d+(?:\.\d+)?)\s*(?:יחידות|יחידה|יח'|יח|pcs)/i, 'יחידה'],
     ];
 
     for (const [pattern, unit] of patterns) {
