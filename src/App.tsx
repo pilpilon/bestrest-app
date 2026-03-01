@@ -92,8 +92,7 @@ function Dashboard() {
     if (!user || !businessId) return;
 
     const q = query(
-      collection(db, 'expenses'),
-      where('businessId', '==', businessId),
+      collection(db, 'businesses', businessId, 'expenses'),
       orderBy('createdAt', 'desc')
     );
 
@@ -297,7 +296,7 @@ function Dashboard() {
     if (!user || !businessId) return;
     setIsSaving(true);
     try {
-      await addDoc(collection(db, 'expenses'), {
+      await addDoc(collection(db, 'businesses', businessId, 'expenses'), {
         ...finalData,
         userId: user.uid,
         userName: user.displayName,
@@ -386,7 +385,8 @@ function Dashboard() {
 
   const deleteExpense = async (expenseId: string) => {
     try {
-      await deleteDoc(doc(db, 'expenses', expenseId));
+      if (!businessId) return;
+      await deleteDoc(doc(db, 'businesses', businessId, 'expenses', expenseId));
       setDeleteConfirmId(null);
       setNotification({ type: 'success', message: 'החשבונית נמחקה בהצלחה.' });
     } catch (error) {
@@ -546,6 +546,7 @@ function Dashboard() {
   };
 
   const confirmSendReport = async () => {
+    if (!businessId) return;
     const unsentExpenses = filteredExpenses.filter(exp => !exp.isSent);
     setShowReportPreview(false);
     setIsSendingReport(true);
@@ -569,7 +570,7 @@ function Dashboard() {
       if (result.success) {
         // Mark only the newly sent expenses as isSent: true in Firestore
         const markSentPromises = unsentExpenses.map(exp =>
-          setDoc(doc(db, 'expenses', exp.id), { isSent: true }, { merge: true })
+          setDoc(doc(db, 'businesses', businessId!, 'expenses', exp.id), { isSent: true }, { merge: true })
         );
         await Promise.all(markSentPromises);
         setNotification({ type: 'success', message: 'הדו״ח נשלח בהצלחה לרואה החשבון!' });

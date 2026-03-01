@@ -13,6 +13,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
+    }
+    const token = authHeader.split('Bearer ')[1];
+    await adminAuth.verifyIdToken(token);
+  } catch (error: any) {
+    console.error("Token verification error:", error);
+    return res.status(401).json({ error: 'Unauthorized: Token verification failed', details: error.message });
+  }
+
   const { expenses, userEmail, userName, accountantEmail, businessName } = req.body;
 
   if (!expenses || !Array.isArray(expenses)) {

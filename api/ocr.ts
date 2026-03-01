@@ -48,12 +48,9 @@ function safeParseJson(raw: string): any {
     let text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
     try {
         return JSON.parse(text);
-    } catch {
-        // Fix unescaped quotes inside string values — common in Hebrew company names like בע"מ
-        // Strategy: replace any " that is NOT preceded by \ and is inside a string value
-        // Simple heuristic: replace ' that appear mid-word in Hebrew context
-        const fixed = text.replace(/(?<=[\u0590-\u05FF\w])"(?=[\u0590-\u05FF\w])/g, "''");
-        return JSON.parse(fixed);
+    } catch (e) {
+        console.warn("Failed to parse JSON natively, fallback string manipulation failed. Text:", text);
+        return [];
     }
 }
 
@@ -146,8 +143,13 @@ function fixSwappedQtyPrice(items: any[]): any[] {
         const price = Number(item.pricePerUnit);
         const total = Number(item.totalPrice);
 
+        const expected = qty * price;
+        const expectedVAT = expected * 1.17;
+        const matchPreTax = Math.abs(expected - total) / total <= 0.05;
+        const matchPostTax = Math.abs(expectedVAT - total) / total <= 0.05;
+
         // Only attempt swap when math holds either way
-        if (total <= 0 || Math.abs(qty * price - total) / total > 0.02) return item;
+        if (total <= 0 || (!matchPreTax && !matchPostTax)) return item;
 
         // Swap heuristic: qty looks like a price (small decimal) and price looks like a qty (large integer)
         const qtyLooksLikePrice = !Number.isInteger(qty) && qty < 10;
@@ -173,7 +175,24 @@ async function extractLineItemsFromImage(imageBase64: string, imageMimeType: str
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const model = genAI.getGenerativeModel({
             model: "gemini-2.5-pro", // Pro for max accuracy on Hebrew invoice image tables
-            generationConfig: { responseMimeType: "application/json" }
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "array",
+                    items: {
+                        type: "object",
+                        properties: {
+                            name: { type: "string" },
+                            quantity: { type: "number" },
+                            unit: { type: "string" },
+                            pricePerUnit: { type: "number" },
+                            totalPrice: { type: "number" },
+                            math_reasoning: { type: "string" }
+                        },
+                        required: ["name", "quantity", "unit", "pricePerUnit", "totalPrice"]
+                    }
+                }
+            }
         });
 
         // Provide raw text as a hint to help Vision disambiguate blurry areas
@@ -251,7 +270,23 @@ async function extractLineItemsFromText(rawText: string): Promise<any[]> {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const model = genAI.getGenerativeModel({
             model: "gemini-2.5-flash",
-            generationConfig: { responseMimeType: "application/json" }
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "array",
+                    items: {
+                        type: "object",
+                        properties: {
+                            name: { type: "string" },
+                            quantity: { type: "number" },
+                            unit: { type: "string" },
+                            pricePerUnit: { type: "number" },
+                            totalPrice: { type: "number" }
+                        },
+                        required: ["name", "quantity", "unit", "pricePerUnit", "totalPrice"]
+                    }
+                }
+            }
         });
         const result = await model.generateContent(
             `Extract line items from this Israeli invoice text. Return ONLY JSON array (no markdown):
@@ -293,8 +328,14 @@ function validateExtraction(lineItems: any[], extractedTotal: number): {
     // Gate 1: qty × price = line total for each row
     lineItems.forEach((item, i) => {
         const expected = Number(item.quantity) * Number(item.pricePerUnit);
+        const expectedWithVAT = expected * 1.17;
         const actual = Number(item.totalPrice);
-        if (actual > 0 && Math.abs(expected - actual) / actual > 0.05) {
+
+        // Match either pre-tax or post-tax within 5%
+        const isMatchPreTax = actual > 0 && Math.abs(expected - actual) / actual <= 0.05;
+        const isMatchPostTax = actual > 0 && Math.abs(expectedWithVAT - actual) / actual <= 0.05;
+
+        if (actual > 0 && !isMatchPreTax && !isMatchPostTax) {
             failedItems.push(i);
         }
         computedSubtotal += actual;
@@ -321,7 +362,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     try {
         const token = authHeader.split('Bearer ')[1];
-        await adminAuth.verifyIdToken(token);
+        const decodedToken = await adminAuth.verifyIdToken(token);
+
+        // Check DoW quota limit server-side
+        const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const tier = userData?.subscriptionTier || 'free';
+            if (tier === 'free') {
+                const todayStr = new Date().toISOString().split('T')[0];
+                const scansToday = (userData?.ocrScanResetDate === todayStr) ? (userData?.ocrScansToday || 0) : 0;
+                if (scansToday >= 1) {
+                    return res.status(403).json({ error: 'Quota exceeded. Please upgrade your subscription.' });
+                }
+            }
+        }
     } catch (error: any) {
         console.error("Token verification error:", error);
         return res.status(401).json({ error: 'Unauthorized: Token verification failed', details: error.message });

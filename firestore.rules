@@ -11,26 +11,48 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && (
-        // Users can update their own document, BUT cannot change their subscription tier
         (request.auth.uid == userId && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['subscriptionTier', 'ocrScanResetDate'])
-          || resource == null // Allow initial creation
+          // Allow creation
+          resource == null ||
+          // ALLOWLIST: Explicit list of exactly what they CAN change
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['displayName', 'photoURL', 'phoneNumber', 'themePreference'])
         )) ||
         // Admins can do anything
         getRole() == 'admin'
       );
     }
 
-    // Expense Rules
-    match /expenses/{expenseId} {
-      function sameBusiness() {
-        return resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
+    // Expense Rules (Migrated to Tenant Path)
+    match /businesses/{businessId}/expenses/{expenseId} {
+      function isTenantMatch() {
+        return businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
       }
       
-      allow read: if request.auth != null && sameBusiness() && (getRole() in ['admin', 'manager', 'accountant']);
-      allow create: if request.auth != null && request.resource.data.businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId && (getRole() in ['admin', 'manager']);
-      allow update: if request.auth != null && sameBusiness() && (getRole() in ['admin', 'manager']);
-      allow delete: if request.auth != null && sameBusiness() && (getRole() == 'admin');
+      allow read: if request.auth != null && isTenantMatch() && (getRole() in ['admin', 'manager', 'accountant']);
+      
+      allow create: if request.auth != null 
+                    && isTenantMatch()
+                    && request.resource.data.businessId == businessId // Lock to path
+                    && (getRole() in ['admin', 'manager']);
+                    
+      allow update: if request.auth != null 
+                    && isTenantMatch() 
+                    && request.resource.data.businessId == resource.data.businessId // Prevent tenant transfer
+                    && (getRole() in ['admin', 'manager']);
+                    
+      allow delete: if request.auth != null && isTenantMatch() && (getRole() == 'admin');
+    }
+    
+    // Add businesses base rule so we don't break customCategories etc
+    match /businesses/{businessId} {
+      allow read: if request.auth != null && businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
+      allow write: if request.auth != null && businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId && (getRole() in ['admin', 'manager']);
+      
+      // Inherit rules for other existing subcollections inside businesses
+      match /{document=**} {
+        allow read, write: if request.auth != null && businessId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId;
+      }
     }
   }
 }

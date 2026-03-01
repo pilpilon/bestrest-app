@@ -34,7 +34,7 @@ function safeParseJson(raw: string): any {
 
 // ─── Create a stable cache key from item name ─────────────────────────────────
 function toCacheKey(name: string): string {
-    return name.trim().toLowerCase().replace(/[^a-z0-9\u0590-\u05FF]/g, '_').slice(0, 80);
+    return Buffer.from(name.trim().toLowerCase()).toString('base64').replace(/=/g, '');
 }
 
 // ─── Fetch market price from Gemini with Google Search Grounding ──────────────
@@ -52,7 +52,7 @@ async function fetchMarketPriceFromAI(itemName: string, itemPrice: number, itemU
 אתה מומחה לעלויות מזון ורכש בתחום הקייטרינג והמסעדנות בישראל.
 
 חפש ברשת את המחיר הסיטונאי הנוכחי בשוק הישראלי עבור המוצר הבא:
-שם: "${itemName}"
+שם: <item>${itemName}</item>
 מחיר שהמסעדן שילם: ₪${itemPrice} ל-${itemUnit}
 
 חוקים חשובים:
@@ -82,6 +82,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, error: 'Unauthorized: Missing or invalid token' });
+        }
+        const token = authHeader.split('Bearer ')[1];
+        await adminAuth.verifyIdToken(token);
+
         const { items } = req.body; // [{ name, price, unit }]
 
         if (!items || !Array.isArray(items) || items.length === 0) {
