@@ -21,7 +21,7 @@ import { ScanQueuePanel } from './components/ScanQueuePanel';
 
 // Firebase Storage import removed — uploads now go directly to OCR API as base64
 import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
 import { RefundPolicy } from './pages/RefundPolicy';
@@ -206,9 +206,13 @@ function Dashboard() {
       (async () => {
         try {
           const base64 = base64DataUrl.split(',')[1];
+          const token = await auth.currentUser?.getIdToken();
           const response = await fetch('/api/ocr', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
             body: JSON.stringify({
               imageBase64: base64,
               mimeType: uploadMimeType,
@@ -546,9 +550,13 @@ function Dashboard() {
     setShowReportPreview(false);
     setIsSendingReport(true);
     try {
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/send-report', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           expenses: unsentExpenses,
           userEmail: user?.email,

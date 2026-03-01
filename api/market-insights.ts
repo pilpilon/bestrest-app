@@ -1,6 +1,21 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { VertexAI } from '@google-cloud/vertexai';
+import { adminAuth } from './firebaseAdmin';
+import { z } from 'zod';
+
+export const maxDuration = 60;
+
+const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+const credentials = credentialsJson ? JSON.parse(credentialsJson) : {};
+const vertex_ai = new VertexAI({ project: credentials.project_id || process.env.VITE_FIREBASE_PROJECT_ID, location: 'us-central1' });
+
+const MarketPriceSchema = z.object({
+  marketPrice: z.number(),
+  recommendedUnit: z.string(),
+  confidence: z.enum(['high', 'medium', 'low'])
+});
 
 // ─── Firebase Admin Init ──────────────────────────────────────────────────────
 const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
@@ -48,7 +63,7 @@ async function fetchMarketPriceFromAI(itemName: string, itemPrice: number, itemU
 מחיר שהמסעדן שילם: ₪${itemPrice} ל-${itemUnit}
 
 חוקים חשובים:
-1. חפש מחירים ב-2024-2025 ממקורות ישראלים (ספקים סיטונאיים, מחירוני מזון, אתרי B2B).
+1. חפש מחירים ב-${new Date().getFullYear()} ממקורות ישראלים (ספקים סיטונאיים, מחירוני מזון, אתרי B2B).
 2. שים לב לגודל האריזה — אם השם מכיל "10 ק\"ג" החזר מחיר לאותה אריזה, לא ל-1 ק\"ג.
 3. מחירים סיטונאיים בלבד — לא סופרמרקט, לא קמעונאי.
 4. החזר JSON בלבד — ללא markdown, ללא הסברים.

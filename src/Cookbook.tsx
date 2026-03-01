@@ -4,7 +4,7 @@ import { RecipeBuilder } from './RecipeBuilder';
 import type { Recipe } from './RecipeBuilder';
 import { useAuth } from './AuthContext';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { UpgradeModal } from './UpgradeModal';
 
 export function Cookbook() {
@@ -81,9 +81,13 @@ export function Cookbook() {
                 reader.readAsDataURL(file);
             });
 
+            const token = await auth.currentUser?.getIdToken();
             const response = await fetch('/api/ocr-menu', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ imageBase64: base64, mimeType: file.type })
             });
             const result = await response.json();

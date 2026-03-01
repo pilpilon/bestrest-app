@@ -55,10 +55,13 @@ export async function generateMarketInsights(expenses: any[]): Promise<MarketIns
 
     // 4. Call the Market Insights API
     try {
+        const { auth } = await import('../firebase');
+        const token = await auth.currentUser?.getIdToken();
         const response = await fetch('/api/market-insights', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
             },
             body: JSON.stringify({ items: topTen })
         });

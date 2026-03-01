@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { ChevronRight, Save, Utensils, Beaker, Plus, X, Camera, Loader2, Info, Trash2 } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { auth } from './firebase';
 import { InventoryPicker, type InventoryPickerItem } from './Inventory';
 
 // ─── Unit conversion helpers ──────────────────────────────────────────────────
@@ -146,9 +147,13 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
 
     const predictCost = async (ingredientId: string, text: string) => {
         try {
+            const token = await auth.currentUser?.getIdToken();
             const response = await fetch('/api/predict-cost', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ ingredientText: text, businessId })
             });
             const result = await response.json();
@@ -280,9 +285,13 @@ export function RecipeBuilder({ initialData, onBack, onSave, onDelete }: RecipeB
                 reader.readAsDataURL(file);
             });
 
+            const token = await auth.currentUser?.getIdToken();
             const response = await fetch('/api/ocr-menu', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ imageBase64: base64, mimeType: file.type })
             });
             const result = await response.json();

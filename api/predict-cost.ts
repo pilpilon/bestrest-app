@@ -1,6 +1,20 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { VertexAI } from '@google-cloud/vertexai';
+import { adminAuth } from './firebaseAdmin';
+import { z } from 'zod';
+
+export const maxDuration = 60;
+
+const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+const credentials = credentialsJson ? JSON.parse(credentialsJson) : {};
+const vertex_ai = new VertexAI({ project: credentials.project_id || process.env.VITE_FIREBASE_PROJECT_ID, location: 'us-central1' });
+
+const PredictCostSchema = z.object({
+  cost: z.number(),
+  matchedItem: z.string()
+});
 
 // Initialize Firebase Admin if not already initialized
 const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
@@ -100,7 +114,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 You are a kitchen master and food cost expert in Israel.
 Given an ingredient and its quantity, predict its cost in Israeli Shekels (₪) based on average market prices for restaurants.
 
-Ingredient: "${ingredientText}"
+<item>
+Ingredient: "${ingredientText.substring(0, 100)}"
+</item>
 
 Respond ONLY with valid JSON:
 {

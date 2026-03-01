@@ -1,5 +1,33 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
+import { VertexAI } from '@google-cloud/vertexai';
+import { adminAuth } from './firebaseAdmin';
+import { z } from 'zod';
+
+export const maxDuration = 60;
+
+const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+const credentials = credentialsJson ? JSON.parse(credentialsJson) : {};
+const vertex_ai = new VertexAI({ project: credentials.project_id || process.env.VITE_FIREBASE_PROJECT_ID, location: 'us-central1' });
+
+const HeaderSchema = z.object({
+    supplier: z.string(),
+    total: z.number(),
+    date: z.string(),
+    category: z.string(),
+    math_reasoning: z.string().optional()
+});
+
+const LineItemSchema = z.object({
+    name: z.string(),
+    quantity: z.number(),
+    unit: z.string(),
+    pricePerUnit: z.number(),
+    totalPrice: z.number(),
+    math_reasoning: z.string().optional()
+});
+const LineItemsArraySchema = z.array(LineItemSchema);
+
 
 // Parse credentials and config from env
 const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
@@ -191,6 +219,7 @@ EXTRACTION RULES:
 
 Return ONLY a valid JSON array, no markdown, no explanation:
 [{"name": "צ'יפס אמריקאי (10 קילו)", "quantity": 2, "unit": "unit", "pricePerUnit": 125.00, "totalPrice": 250.00}]
+Include a "math_reasoning" field per item showing quantity * pricePerUnit = totalPrice.
 If no line items found, return [].${textHint}`;
 
         const result = await model.generateContent([
@@ -239,7 +268,7 @@ Verify: quantity × pricePerUnit ≈ totalPrice.
 If none found return [].
 Text:\n${rawText.substring(0, 3000)}`
         );
-        let text = result.response.text().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+        let text = result.response.candidates[0].content.parts[0].text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
         const parsed = safeParseJson(text);
         let items = Array.isArray(parsed) ? parsed : [];
         // Normalize units
@@ -289,6 +318,17 @@ function validateExtraction(lineItems: any[], extractedTotal: number): {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
+    }
+    try {
+        const token = authHeader.split('Bearer ')[1];
+        await adminAuth.verifyIdToken(token);
+    } catch (error) {
+        return res.status(401).json({ error: 'Unauthorized: Token verification failed' });
     }
 
     const { imageBase64, mimeType } = req.body;

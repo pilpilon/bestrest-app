@@ -1,0 +1,126 @@
+# BestRest Application Audit Document
+
+## Overview
+This document outlines the architecture, toolchain, and AI prompt configuration of the **BestRest** application. It is provided for external technical auditing and improvement suggestions.
+
+## Application Architecture & Stack
+- **Frontend Framework**: React 19 + Vite + TypeScript
+- **Styling**: Tailwind CSS v4 (PostCSS)
+- **State Management & Data Hooks**: Custom React Hooks interfacing with Firebase
+- **Backend Infrastructure**: Vercel Serverless Functions (`/api/*`)
+- **Database & Auth**: Firebase / Firestore (Client-side usage & Admin SDK on Vercel)
+- **AI Integration**: Google Cloud Document AI, Google Cloud Vision, and Google Gemini (2.5-pro, 2.5-flash, 2.5-flash-lite with Search Grounding).
+
+---
+
+## AI Implementation & Logic
+
+The core logic of BestRest heavily relies on extracting structured data from right-to-left (RTL) Hebrew receipts, menus, and invoices, as well as providing culinary and market estimations.
+
+### 1. Invoice & Receipt Processing (`ocr.ts`, `ocr-vision-items.ts`, `ocr-items.ts`)
+The application uses a hybrid approach to read invoices:
+- **Google Cloud Document AI (Regional endpoint)**: Primary tool for extracting structured header entities (supplier name, total amount, invoice date).
+- **Google Cloud Vision API**: Fallback text extraction (OCR).
+- **Gemini 2.5 Pro (Vision Input)**: Primary engine for reading complex tabular data and returning a strict array of JSON objects representing table line-items.
+
+**Prompt Configuration (Line Item Extraction):**
+```text
+You are an expert at reading Israeli supplier invoices (חשבוניות ספקים).
+Carefully examine this invoice IMAGE and extract EVERY product line item from the table.
+
+Israeli invoices are RTL (right-to-left). The table columns are typically ordered RIGHT to LEFT as:
+  # (row number) | שם פריט (product name) | כמות (quantity) | מחיר ליחידה (unit price) | סה"כ / סכום (line total)
+
+EXTRACTION RULES:
+1. "name": The FULL product name in Hebrew exactly as written on the invoice.
+   Include size/weight descriptors that are part of the name (e.g. "צ'יפס אמריקאי (10 קילו)").
+2. "quantity": The value from the QUANTITY COLUMN (כמות). Can be decimal like 24.60 for kg.
+   Do NOT confuse with product weight/size in the name.
+3. "unit": One of these ASCII codes ONLY: unit, kg, gram, liter, ml, case, pack
+   - If quantity > 5 and decimal, likely "kg". Small integer → "unit".
+4. "pricePerUnit": Price PER SINGLE UNIT from the unit-price column BEFORE multiplication.
+5. "totalPrice": LINE TOTAL from the total column AFTER multiplication.
+6. VERIFY: quantity × pricePerUnit ≈ totalPrice (within 5%). If not, re-read.
+
+Return ONLY a valid JSON array. No markdown, no explanation:
+[{"name":"צ'יפס אמריקאי (10 קילו)","quantity":2,"unit":"unit","pricePerUnit":125.00,"totalPrice":250.00}]
+If no items found, return [].
+```
+
+**Cross-Validation Heuristics**: 
+Post-processing includes heuristics to swap `quantity` and `pricePerUnit` if they appear logically swapped (`qty` being a price-like decimal and `price` being a quantity-like integer), matching mathematically to the `totalPrice`.
+
+### 2. Market Pricing Insights (`market-insights.ts`)
+Monitors market inflation by running Gemini-powered ground-truth comparisons against wholesale markets for a given product to indicate savings or over-spending.
+- **Model:** `gemini-2.5-flash-lite` (with Google Search Grounding).
+
+**Prompt Configuration:**
+```text
+אתה מומחה לעלויות מזון ורכש בתחום הקייטרינג והמסעדנות בישראל.
+
+חפש ברשת את המחיר הסיטונאי הנוכחי בשוק הישראלי עבור המוצר הבא:
+שם: "{itemName}"
+מחיר שהמסעדן שילם: ₪{itemPrice} ל-{itemUnit}
+
+חוקים חשובים:
+1. חפש מחירים ב-2024-2025 ממקורות ישראלים (ספקים סיטונאיים, מחירוני מזון, אתרי B2B).
+2. שים לב לגודל האריזה — אם השם מכיל "10 ק"ג" החזר מחיר לאותה אריזה, לא ל-1 ק"ג.
+3. מחירים סיטונאיים בלבד — לא סופרמרקט, לא קמעונאי.
+4. החזר JSON בלבד — ללא markdown, ללא הסברים.
+
+פורמט תשובה:
+{
+  "marketPrice": <number>,
+  "recommendedUnit": "<תיאור האריזה, לדוגמה: מארז 10 ק"ג>",
+  "confidence": "<high|medium|low>"
+}
+```
+
+### 3. Kitchen & Food Cost Prediction (`predict-cost.ts`)
+Calculates estimated prices based on local market averages. Acts as a fallback when the internal DB lookup algorithm yields no results.
+- **Model**: `gemini-2.5-flash-lite`.
+
+**Prompt Configuration**:
+```text
+You are a kitchen master and food cost expert in Israel.
+Given an ingredient and its quantity, predict its cost in Israeli Shekels (₪) based on average market prices for restaurants.
+
+Ingredient: "{ingredientText}"
+
+Respond ONLY with valid JSON:
+{
+  "cost": 12.5,
+  "matchedItem": "Description of the item matched"
+}
+```
+
+### 4. Menu OCR Parsing (`ocr-menu.ts`)
+Converts restaurant menu photos into structured dishes and prices.
+- **Model**: `gemini-2.5-flash-lite`.
+
+**Prompt Configuration**:
+```text
+You are an expert at extracting menus from photos.
+Extract a list of dishes and their prices from the provided image.
+Be precise with the names in Hebrew and the prices in numbers (ILS).
+
+Respond ONLY with valid JSON:
+{
+  "dishes": [
+    { "name": "Dish Name", "price": 89.0 },
+    ...
+  ]
+}
+```
+
+---
+
+## Known Edges & Defensive Mechanisms
+- **Hebrew Quotes `"` Bug**: A global regex patch `/(?<=[\u0590-\u05FF\w])"(?=[\u0590-\u05FF\w])/g` runs post-JSON-generation to catch unescaped Israeli quote acronyms (e.g., בע"מ which ruins standard JSON.parse).
+- **RTL Image Ambiguity**: Vercel/Gemini occasionally swaps specific tables values. Defensive code logic applies basic total price validation gates to calculate failures.
+
+## Audit Objective
+Please review the system and identify optimization points around:
+- **Cost vs Performance constraints**: Balancing Flash vs Pro prompts on Vercel APIs.
+- **Prompt Polish**: Enhancing deterministic extractions.
+- **Data sanitization methodologies**.

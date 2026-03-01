@@ -6,6 +6,9 @@
 - **Recipe Builder**: AI-assisted tool for calculating food cost, margins, and establishing prep instructions from ingredients.
 - **Real-time Price Rise Tracker**: Compares active vendor invoices to previous billing cycles and tags inflating products automatically.
 - **Multi-Role Security**: Admins, Managers, and Accountants have segregated views of operations.
+- **Backend API Security Layer**: Firebase Admin SDK `verifyIdToken` guards on all endpoints to prevent unauthenticated consumption and DoW limit breaching.
+- **Data Validation Guardrails**: Zod structures to safely map, test math accuracy (via internal LLM Chain of Thought reasoning elements), and flag low confidence OCR scans requiring manual review upon failing checks.
+- **Enterprise AI Infrastructure**: Seamless Vertex AI integration with cost-saving fallback waterfalls (from gemini-flash up to gemini-pro upon validation failures).
 - **Daily OCR Scan Paywall**: 1 free scan per day gate that auto-resets based on the date strings, pushing the 299 NIS limit breaker.
 - **Invite Links**: Secure URL params to onboard team members without leaking overall branch settings.
 - **Scan Queue System**: Background processing of multiple receipts simultaneously with real-time Firestore status tracking and non-blocking UI.

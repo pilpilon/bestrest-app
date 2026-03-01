@@ -1,5 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { Resend } from 'resend';
+import { adminAuth } from './firebaseAdmin';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
