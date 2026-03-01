@@ -695,8 +695,8 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
                                         {isCalculated && (
                                             <div className="relative w-full h-6 mt-2 text-[10px] font-bold" dir="ltr">
                                                 <span className="absolute left-0 text-[var(--color-text-muted)]">0%</span>
-                                                <span className="absolute left-1/2 -translate-x-1/2 text-[var(--color-primary)]">מצוין 50%</span>
-                                                <span className="absolute left-[60%] -translate-x-1/2 text-yellow-400">גבול 60%</span>
+                                                <span className="absolute left-1/2 -translate-x-1/2 text-[var(--color-primary)]">50%</span>
+                                                <span className="absolute left-[60%] -translate-x-1/2 text-yellow-400">60%</span>
                                                 <span className="absolute right-0 text-[var(--color-danger)]">100%</span>
                                             </div>
                                         )}
