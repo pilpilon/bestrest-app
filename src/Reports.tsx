@@ -606,13 +606,13 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
                                 <div className="relative">
                                     <input
                                         type="number"
-                                        placeholder="100,000"
+                                        placeholder="100000"
                                         value={primeRevenue}
                                         onChange={e => setPrimeRevenue(e.target.value)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors"
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl pl-10 pr-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors text-right"
                                         dir="ltr"
                                     />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]">₪</span>
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] font-bold">₪</span>
                                 </div>
                             </div>
 
@@ -628,10 +628,10 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
                                         type="number"
                                         value={foodCostInput}
                                         onChange={e => setFoodCostInput(e.target.value)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors"
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl pl-10 pr-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors text-right"
                                         dir="ltr"
                                     />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]">₪</span>
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] font-bold">₪</span>
                                 </div>
                             </div>
 
@@ -645,13 +645,13 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
                                 <div className="relative">
                                     <input
                                         type="number"
-                                        placeholder="28,000"
+                                        placeholder="28000"
                                         value={primeLabor}
                                         onChange={e => setPrimeLabor(e.target.value)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors"
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl pl-10 pr-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors text-right"
                                         dir="ltr"
                                     />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]">₪</span>
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] font-bold">₪</span>
                                 </div>
                             </div>
 
@@ -665,8 +665,8 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
 
                                     <div className="text-center">
                                         <div className="flex flex-col items-center justify-center">
-                                            <span className={`text-7xl font-black mb-2 transition-colors ${isCalculated ? (primeCostPercent <= 55 ? 'text-[var(--color-primary)]' : primeCostPercent <= 60 ? 'text-yellow-400' : 'text-[var(--color-danger)]') : 'text-slate-700'}`}>
-                                                {isCalculated ? primeCostPercent.toFixed(1) : '--'}%
+                                            <span className={`text-5xl md:text-7xl font-black mb-2 transition-colors break-all ${isCalculated ? (primeCostPercent <= 55 ? 'text-[var(--color-primary)]' : primeCostPercent <= 60 ? 'text-yellow-400' : 'text-[var(--color-danger)]') : 'text-slate-700'}`}>
+                                                {isCalculated ? (primeCostPercent > 999 ? '>999' : primeCostPercent.toFixed(1)) : '--'}%
                                             </span>
                                             <p className="text-[var(--color-text-muted)] font-medium flex items-center gap-2 text-lg">
                                                 {isCalculated ? (
