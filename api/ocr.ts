@@ -360,11 +360,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!authHeader?.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
     }
+    // 1. Token Verification
+    let decodedToken;
     try {
         const token = authHeader.split('Bearer ')[1];
-        const decodedToken = await adminAuth.verifyIdToken(token);
+        decodedToken = await adminAuth.verifyIdToken(token);
+    } catch (error: any) {
+        console.error("Token verification error:", error);
+        return res.status(401).json({ error: 'Unauthorized: Token verification failed', details: error.message });
+    }
 
-        // Check DoW quota limit server-side
+    // 2. DoW Quota Check
+    try {
         const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
         if (userDoc.exists) {
             const userData = userDoc.data();
@@ -378,8 +385,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
     } catch (error: any) {
-        console.error("Token verification error:", error);
-        return res.status(401).json({ error: 'Unauthorized: Token verification failed', details: error.message });
+        console.error("Firestore Admin DB error during quota check:", error);
+        // If Vercel environment variables are missing (PERMISSION_DENIED), we bypass the quota check 
+        // temporarily so the user's business isn't blocked by deployment misconfigurations.
+        if (!error.message?.includes('PERMISSION_DENIED')) {
+            return res.status(500).json({ error: 'Internal server error checking quota', details: error.message });
+        }
     }
 
     const { imageBase64, mimeType } = req.body;
