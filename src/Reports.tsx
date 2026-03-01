@@ -56,9 +56,7 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
     const [timeFilter, setTimeFilter] = useState<'month' | 'quarter' | 'year' | 'all'>('all');
     const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
 
-    // Prime Cost State
-    const [primeRevenue, setPrimeRevenue] = useState<string>('');
-    const [primeLabor, setPrimeLabor] = useState<string>('');
+
 
     // Sync initialSection prop to state when it changes
     useEffect(() => {
@@ -93,6 +91,28 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
             }
         });
     }, [expenses, timeFilter]);
+
+    // Prime Cost State
+    const [primeRevenue, setPrimeRevenue] = useState<string>('');
+    const [primeLabor, setPrimeLabor] = useState<string>('');
+    const [foodCostInput, setFoodCostInput] = useState<string>('0');
+
+    // Default food cost is sum of expenses
+    const currentTotalExpenses = useMemo(() => {
+        return filteredExpenses.reduce((sum, e) => sum + (e.total || 0), 0);
+    }, [filteredExpenses]);
+
+    // Initialize/Sync foodCostInput when expenses change
+    useEffect(() => {
+        setFoodCostInput(currentTotalExpenses.toString());
+    }, [currentTotalExpenses]);
+
+    const rev = parseFloat(primeRevenue) || 0;
+    const fc = parseFloat(foodCostInput) || 0;
+    const lc = parseFloat(primeLabor) || 0;
+    const totalPc = fc + lc;
+    const primeCostPercent = rev > 0 ? (totalPc / rev) * 100 : 0;
+    const isCalculated = rev > 0 && totalPc > 0;
 
     // --- Expenses Analytics Data ---
 
@@ -596,146 +616,122 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
                                 </div>
                             </div>
 
-                            {/* Food Cost (COGS) - Automatically summed from expenses... OR manual? Wait, the user said "We already have food cost... user just needs to insert Revenue and Labor Cost" */}
-                            {/* Since this is a simple calculator, let's pre-fill the food cost based on the sum of expenses BUT let them edit. Let's make it auto-calculate first */}
-                            {(() => {
-                                // Default food cost is sum of expenses (maybe in the selected time filter?)
-                                // Let's just create a state for it if we want to allow editing, or just use a calculated value. Let's make it an editable state prefilled, or just display it.
-                                const currentMonthExpenses = filteredExpenses.reduce((sum, e) => sum + (e.total || 0), 0);
-                                const [foodCostInput, setFoodCostInput] = useState<string>(currentMonthExpenses.toString());
+                            {/* Food Cost (COGS) */}
+                            <div>
+                                <label className="flex items-center justify-between mb-2">
+                                    <span className="font-bold text-white">עלות מזון</span>
+                                    <span className="text-xl">🥩</span>
+                                </label>
+                                <p className="text-xs text-[var(--color-text-muted)] mb-3">חומרי גלם, קניות, ספקים (עודכן אוטומטית לפי ההוצאות)</p>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        value={foodCostInput}
+                                        onChange={e => setFoodCostInput(e.target.value)}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors"
+                                        dir="ltr"
+                                    />
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]">₪</span>
+                                </div>
+                            </div>
 
-                                // Sync if they change time filter? Nah, we hide time filter for prime cost. We use total expenses from the default filter, or just current month.
-                                useEffect(() => {
-                                    setFoodCostInput(currentMonthExpenses.toString());
-                                }, [currentMonthExpenses]);
+                            {/* Labor Cost */}
+                            <div>
+                                <label className="flex items-center justify-between mb-2">
+                                    <span className="font-bold text-white">עלות עבודה</span>
+                                    <span className="text-xl">👨‍🍳</span>
+                                </label>
+                                <p className="text-xs text-[var(--color-text-muted)] mb-3">משכורות, שעות נוספות, ביטוח לאומי</p>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        placeholder="28,000"
+                                        value={primeLabor}
+                                        onChange={e => setPrimeLabor(e.target.value)}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors"
+                                        dir="ltr"
+                                    />
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]">₪</span>
+                                </div>
+                            </div>
 
-                                const rev = parseFloat(primeRevenue) || 0;
-                                const fc = parseFloat(foodCostInput) || 0;
-                                const lc = parseFloat(primeLabor) || 0;
-                                const totalPc = fc + lc;
-                                const primeCostPercent = rev > 0 ? (totalPc / rev) * 100 : 0;
-                                const isCalculated = rev > 0 && totalPc > 0;
+                            {/* Result Section */}
+                            <div className="md:col-span-1 mt-6">
+                                <div className="bg-[#1E293B]/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 relative overflow-hidden">
+                                    <h3 className="font-bold flex items-center gap-2 mb-8 text-xl text-white">
+                                        <span className="bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] text-sm w-6 h-6 rounded-full flex items-center justify-center font-black">2</span>
+                                        תוצאה
+                                    </h3>
 
-                                return (
-                                    <>
-                                        <div>
-                                            <label className="flex items-center justify-between mb-2">
-                                                <span className="font-bold text-white">עלות מזון</span>
-                                                <span className="text-xl">🥩</span>
-                                            </label>
-                                            <p className="text-xs text-[var(--color-text-muted)] mb-3">חומרי גלם, קניות, ספקים</p>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    value={foodCostInput}
-                                                    onChange={e => setFoodCostInput(e.target.value)}
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors"
-                                                    dir="ltr"
-                                                />
-                                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]">₪</span>
-                                            </div>
+                                    <div className="text-center">
+                                        <div className="flex flex-col items-center justify-center">
+                                            <span className={`text-7xl font-black mb-2 transition-colors ${isCalculated ? (primeCostPercent <= 55 ? 'text-[var(--color-primary)]' : primeCostPercent <= 60 ? 'text-yellow-400' : 'text-[var(--color-danger)]') : 'text-slate-700'}`}>
+                                                {isCalculated ? primeCostPercent.toFixed(1) : '--'}%
+                                            </span>
+                                            <p className="text-[var(--color-text-muted)] font-medium flex items-center gap-2 text-lg">
+                                                {isCalculated ? (
+                                                    <>סה״כ Prime Cost</>
+                                                ) : (
+                                                    <>הכנס נתונים <span className="text-xl animate-pulse">📊</span></>
+                                                )}
+                                            </p>
                                         </div>
 
-                                        {/* Labor Cost */}
-                                        <div>
-                                            <label className="flex items-center justify-between mb-2">
-                                                <span className="font-bold text-white">עלות עבודה</span>
-                                                <span className="text-xl">👨‍🍳</span>
-                                            </label>
-                                            <p className="text-xs text-[var(--color-text-muted)] mb-3">משכורות, שעות נוספות, ביטוח לאומי</p>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    placeholder="28,000"
-                                                    value={primeLabor}
-                                                    onChange={e => setPrimeLabor(e.target.value)}
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white text-xl focus:border-[var(--color-primary)] outline-none transition-colors"
-                                                    dir="ltr"
-                                                />
-                                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]">₪</span>
+                                        {!isCalculated && (
+                                            <p className="text-xs text-slate-500 mt-4">מלא את השדות כדי לחשב</p>
+                                        )}
+
+                                        {isCalculated && (
+                                            <div className="mt-8 relative w-full h-4 bg-white/5 rounded-full overflow-hidden border border-white/10">
+                                                <div
+                                                    className={`absolute left-0 top-0 h-full transition-all duration-1000 ${primeCostPercent <= 55 ? 'bg-[var(--color-primary)]' : primeCostPercent <= 60 ? 'bg-yellow-400' : 'bg-[var(--color-danger)]'}`}
+                                                    style={{ width: `${Math.min(primeCostPercent, 100)}%` }}
+                                                ></div>
+                                                {/* Markers */}
+                                                <div className="absolute top-0 right-1/2 h-full w-px bg-white/20"></div>
+                                                <div className="absolute top-0 right-[40%] h-full w-px bg-white/20"></div>
                                             </div>
-                                        </div>
-
-                                        {/* Result Section */}
-                                        <div className="md:col-span-1 mt-6">
-                                            <div className="bg-[#1E293B]/50 backdrop-blur-xl border border-white/10 rounded-2xl p-6 md:p-8 relative overflow-hidden">
-                                                <h3 className="font-bold flex items-center gap-2 mb-8 text-xl text-white">
-                                                    <span className="bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] text-sm w-6 h-6 rounded-full flex items-center justify-center font-black">2</span>
-                                                    תוצאה
-                                                </h3>
-
-                                                <div className="text-center">
-                                                    <div className="flex flex-col items-center justify-center">
-                                                        <span className={`text-7xl font-black mb-2 transition-colors ${isCalculated ? (primeCostPercent <= 55 ? 'text-[var(--color-primary)]' : primeCostPercent <= 60 ? 'text-yellow-400' : 'text-[var(--color-danger)]') : 'text-slate-700'}`}>
-                                                            {isCalculated ? primeCostPercent.toFixed(1) : '--'}%
-                                                        </span>
-                                                        <p className="text-[var(--color-text-muted)] font-medium flex items-center gap-2 text-lg">
-                                                            {isCalculated ? (
-                                                                <>סה״כ Prime Cost</>
-                                                            ) : (
-                                                                <>הכנס נתונים <span className="text-xl animate-pulse">📊</span></>
-                                                            )}
-                                                        </p>
-                                                    </div>
-
-                                                    {!isCalculated && (
-                                                        <p className="text-xs text-slate-500 mt-4">מלא את השדות כדי לחשב</p>
-                                                    )}
-
-                                                    {isCalculated && (
-                                                        <div className="mt-8 relative w-full h-4 bg-white/5 rounded-full overflow-hidden border border-white/10">
-                                                            <div
-                                                                className={`absolute left-0 top-0 h-full transition-all duration-1000 ${primeCostPercent <= 55 ? 'bg-[var(--color-primary)]' : primeCostPercent <= 60 ? 'bg-yellow-400' : 'bg-[var(--color-danger)]'}`}
-                                                                style={{ width: `${Math.min(primeCostPercent, 100)}%` }}
-                                                            ></div>
-                                                            {/* Markers */}
-                                                            <div className="absolute top-0 right-1/2 h-full w-px bg-white/20"></div>
-                                                            <div className="absolute top-0 right-[40%] h-full w-px bg-white/20"></div>
-                                                        </div>
-                                                    )}
-                                                    {isCalculated && (
-                                                        <div className="flex justify-between mt-2 text-[10px] font-bold">
-                                                            <span className="text-[var(--color-text-muted)]">0%</span>
-                                                            <div className="flex w-full justify-between px-4" dir="rtl">
-                                                                <span className="text-[var(--color-primary)]">מצוין 50%</span>
-                                                                <span className="text-yellow-400">גבול 60%</span>
-                                                            </div>
-                                                            <span className="text-[var(--color-danger)]">100%</span>
-                                                        </div>
-                                                    )}
+                                        )}
+                                        {isCalculated && (
+                                            <div className="flex justify-between mt-2 text-[10px] font-bold">
+                                                <span className="text-[var(--color-text-muted)]">0%</span>
+                                                <div className="flex w-full justify-between px-4" dir="rtl">
+                                                    <span className="text-[var(--color-primary)]">מצוין 50%</span>
+                                                    <span className="text-yellow-400">גבול 60%</span>
                                                 </div>
+                                                <span className="text-[var(--color-danger)]">100%</span>
                                             </div>
+                                        )}
+                                    </div>
+                                </div>
 
-                                            {/* Educational Context */}
-                                            <div className="bg-black/40 border border-white/5 rounded-2xl p-6 mt-4">
-                                                <h4 className="font-bold flex items-center gap-2 mb-3 text-white">
-                                                    <span className="text-lg">📖</span> מה זה Prime Cost?
-                                                </h4>
-                                                <p className="text-sm text-[var(--color-text-muted)] leading-relaxed mb-4">
-                                                    <strong className="text-white">Prime Cost</strong> הוא הסכום של עלות המזון + עלות העבודה, מחולק בסך ההכנסות. זהו המדד החשוב ביותר לרווחיות מסעדה.
-                                                </p>
-                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                    <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-3 text-center">
-                                                        <p className="font-black text-green-400 text-sm mb-1">מתחת ל-50%</p>
-                                                        <p className="text-[11px] font-bold text-white mb-1">מצוין</p>
-                                                        <p className="text-[10px] text-[var(--color-text-muted)]">יעילות גבוהה</p>
-                                                    </div>
-                                                    <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3 text-center">
-                                                        <p className="font-black text-yellow-400 text-sm mb-1">50%-60%</p>
-                                                        <p className="text-[11px] font-bold text-white mb-1">תקין</p>
-                                                        <p className="text-[10px] text-[var(--color-text-muted)]">הטווח הבריא</p>
-                                                    </div>
-                                                    <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-3 text-center">
-                                                        <p className="font-black text-red-500 text-sm mb-1">מעל 60%</p>
-                                                        <p className="text-[11px] font-bold text-white mb-1">סכנה</p>
-                                                        <p className="text-[10px] text-[var(--color-text-muted)]">קשה לשרוד</p>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                {/* Educational Context */}
+                                <div className="bg-black/40 border border-white/5 rounded-2xl p-6 mt-4">
+                                    <h4 className="font-bold flex items-center gap-2 mb-3 text-white">
+                                        <span className="text-lg">📖</span> מה זה Prime Cost?
+                                    </h4>
+                                    <p className="text-sm text-[var(--color-text-muted)] leading-relaxed mb-4">
+                                        <strong className="text-white">Prime Cost</strong> הוא הסכום של עלות המזון + עלות העבודה, מחולק בסך ההכנסות. זהו המדד החשוב ביותר לרווחיות מסעדה.
+                                    </p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-3 text-center">
+                                            <p className="font-black text-green-400 text-sm mb-1">מתחת ל-50%</p>
+                                            <p className="text-[11px] font-bold text-white mb-1">מצוין</p>
+                                            <p className="text-[10px] text-[var(--color-text-muted)]">יעילות גבוהה</p>
                                         </div>
-                                    </>
-                                );
-                            })()}
+                                        <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3 text-center">
+                                            <p className="font-black text-yellow-400 text-sm mb-1">50%-60%</p>
+                                            <p className="text-[11px] font-bold text-white mb-1">תקין</p>
+                                            <p className="text-[10px] text-[var(--color-text-muted)]">הטווח הבריא</p>
+                                        </div>
+                                        <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-3 text-center">
+                                            <p className="font-black text-red-500 text-sm mb-1">מעל 60%</p>
+                                            <p className="text-[11px] font-bold text-white mb-1">סכנה</p>
+                                            <p className="text-[10px] text-[var(--color-text-muted)]">קשה לשרוד</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
