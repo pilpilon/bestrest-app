@@ -2,7 +2,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { VertexAI } from '@google-cloud/vertexai';
-import { adminAuth } from './firebaseAdmin.js';
+import { adminAuth, adminDb } from './firebaseAdmin.js';
 import { z } from 'zod';
 
 export const maxDuration = 60;
@@ -19,13 +19,7 @@ const MarketPriceSchema = z.object({
 // ─── Cache TTL: 7 days in ms ──────────────────────────────────────────────────
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-// ─── Firebase Admin Init ──────────────────────────────────────────────────────
-// credentialsJson is defined above
-if (getApps().length === 0 && credentialsJson) {
-    const cred = JSON.parse(credentialsJson);
-    initializeApp({ credential: cert(cred) });
-}
-const adminDb = getApps().length > 0 ? getFirestore() : null;
+
 
 // ─── Safe JSON parser ─────────────────────────────────────────────────────────
 function safeParseJson(raw: string): any {

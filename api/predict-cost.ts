@@ -2,7 +2,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { VertexAI } from '@google-cloud/vertexai';
-import { adminAuth } from './firebaseAdmin.js';
+import { adminAuth, adminDb } from './firebaseAdmin.js';
 import { z } from 'zod';
 
 export const maxDuration = 60;
@@ -16,12 +16,7 @@ const PredictCostSchema = z.object({
     matchedItem: z.string()
 });
 
-// Initialize Firebase Admin if not already initialized
-if (getApps().length === 0 && credentialsJson) {
-    const cred = JSON.parse(credentialsJson);
-    initializeApp({ credential: cert(cred) });
-}
-const adminDb = getApps().length > 0 ? getFirestore() : null;
+
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
