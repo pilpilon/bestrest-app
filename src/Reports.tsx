@@ -682,24 +682,22 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
                                         )}
 
                                         {isCalculated && (
-                                            <div className="mt-8 relative w-full h-4 bg-white/5 rounded-full overflow-hidden border border-white/10">
+                                            <div className="mt-8 relative w-full h-4 bg-white/5 rounded-full overflow-hidden border border-white/10" dir="ltr">
                                                 <div
                                                     className={`absolute left-0 top-0 h-full transition-all duration-1000 ${primeCostPercent <= 55 ? 'bg-[var(--color-primary)]' : primeCostPercent <= 60 ? 'bg-yellow-400' : 'bg-[var(--color-danger)]'}`}
                                                     style={{ width: `${Math.min(primeCostPercent, 100)}%` }}
                                                 ></div>
                                                 {/* Markers */}
-                                                <div className="absolute top-0 right-1/2 h-full w-px bg-white/20"></div>
-                                                <div className="absolute top-0 right-[40%] h-full w-px bg-white/20"></div>
+                                                <div className="absolute top-0 left-1/2 h-full w-px bg-black/40 z-10"></div>
+                                                <div className="absolute top-0 left-[60%] h-full w-px bg-black/40 z-10"></div>
                                             </div>
                                         )}
                                         {isCalculated && (
-                                            <div className="flex justify-between mt-2 text-[10px] font-bold">
-                                                <span className="text-[var(--color-text-muted)]">0%</span>
-                                                <div className="flex w-full justify-between px-4" dir="rtl">
-                                                    <span className="text-[var(--color-primary)]">מצוין 50%</span>
-                                                    <span className="text-yellow-400">גבול 60%</span>
-                                                </div>
-                                                <span className="text-[var(--color-danger)]">100%</span>
+                                            <div className="relative w-full h-6 mt-2 text-[10px] font-bold" dir="ltr">
+                                                <span className="absolute left-0 text-[var(--color-text-muted)]">0%</span>
+                                                <span className="absolute left-1/2 -translate-x-1/2 text-[var(--color-primary)]">מצוין 50%</span>
+                                                <span className="absolute left-[60%] -translate-x-1/2 text-yellow-400">גבול 60%</span>
+                                                <span className="absolute right-0 text-[var(--color-danger)]">100%</span>
                                             </div>
                                         )}
                                     </div>
