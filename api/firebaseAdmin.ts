@@ -4,8 +4,10 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 if (getApps().length === 0) {
     let credential;
-    // Try to load from either env variable used in the project
-    const credString = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON || process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    // Always prioritize the explicit Firebase setup variable. 
+    // If not found, fall back to the generic Google Application one 
+    // (though the latter might point to the wrong GCP project).
+    const credString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
 
     if (credString) {
         try {
