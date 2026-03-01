@@ -18,7 +18,8 @@ if (getApps().length === 0) {
     }
 
     initializeApp({
-        credential: credential || applicationDefault()
+        credential: credential || applicationDefault(),
+        projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'bestrest-8f1a4'
     });
 }
 
