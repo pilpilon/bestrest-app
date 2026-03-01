@@ -742,9 +742,9 @@ function Dashboard() {
                 >
                   <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-primary)]"></div>
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">הוצאות החודש</p>
-                  <h3 className="text-2xl font-black">₪{monthlyTotal.toLocaleString()}</h3>
+                  <h3 className="text-2xl font-black">₪{currentMonthTotal.toLocaleString()}</h3>
                   <div className="mt-2 flex items-center gap-1 text-[10px] font-bold">
-                    {monthlyChange !== null ? (
+                    {monthlyChange !== null && currentMonthTotal > 0 ? (
                       <span className={`px-1.5 py-0.5 rounded ${parseFloat(monthlyChange) > 0
                         ? 'bg-red-500/10 text-red-400'
                         : 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
@@ -752,7 +752,9 @@ function Dashboard() {
                         {parseFloat(monthlyChange) > 0 ? '+' : ''}{monthlyChange}% מחודש שעבר
                       </span>
                     ) : (
-                      <span className="text-[var(--color-text-muted)]">אין נתון השוואתי</span>
+                      <span className="text-[var(--color-text-muted)] bg-white/5 px-1.5 py-0.5 rounded">
+                        {currentMonthTotal === 0 ? 'טרם הוזנו הוצאות' : 'אין נתון השוואתי'}
+                      </span>
                     )}
                   </div>
                 </div>
