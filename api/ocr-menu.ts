@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { VertexAI } from '@google-cloud/vertexai';
-import { adminAuth } from './firebaseAdmin';
+import { adminAuth } from './firebaseAdmin.js';
 import { z } from 'zod';
 
 export const maxDuration = 60;
@@ -10,11 +10,11 @@ const credentials = credentialsJson ? JSON.parse(credentialsJson) : {};
 const vertex_ai = new VertexAI({ project: credentials.project_id || process.env.VITE_FIREBASE_PROJECT_ID, location: 'us-central1' });
 
 const DishItemSchema = z.object({
-  name: z.string(),
-  price: z.number()
+    name: z.string(),
+    price: z.number()
 });
 const MenuSchema = z.object({
-  dishes: z.array(DishItemSchema)
+    dishes: z.array(DishItemSchema)
 });
 
 /**

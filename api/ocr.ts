@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
 import { VertexAI } from '@google-cloud/vertexai';
-import { adminAuth } from './firebaseAdmin';
+import { adminAuth } from './firebaseAdmin.js';
 import { z } from 'zod';
 
 export const maxDuration = 60;

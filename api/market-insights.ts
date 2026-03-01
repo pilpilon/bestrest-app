@@ -2,7 +2,7 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { VertexAI } from '@google-cloud/vertexai';
-import { adminAuth } from './firebaseAdmin';
+import { adminAuth } from './firebaseAdmin.js';
 import { z } from 'zod';
 
 export const maxDuration = 60;

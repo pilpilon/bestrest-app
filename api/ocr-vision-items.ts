@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { VertexAI } from '@google-cloud/vertexai';
-import { adminAuth } from './firebaseAdmin';
+import { adminAuth } from './firebaseAdmin.js';
 import { z } from 'zod';
 
 const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
@@ -8,12 +8,12 @@ const credentials = credentialsJson ? JSON.parse(credentialsJson) : {};
 const vertex_ai = new VertexAI({ project: credentials.project_id || process.env.VITE_FIREBASE_PROJECT_ID, location: 'us-central1' });
 
 const LineItemSchema = z.object({
-  name: z.string(),
-  quantity: z.number(),
-  unit: z.string(),
-  pricePerUnit: z.number(),
-  totalPrice: z.number(),
-  math_reasoning: z.string().optional()
+    name: z.string(),
+    quantity: z.number(),
+    unit: z.string(),
+    pricePerUnit: z.number(),
+    totalPrice: z.number(),
+    math_reasoning: z.string().optional()
 });
 const LineItemsArraySchema = z.array(LineItemSchema);
 
