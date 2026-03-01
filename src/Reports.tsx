@@ -99,7 +99,8 @@ export function Reports({ expenses, initialSection }: ReportsProps) {
 
     // Default food cost is sum of expenses
     const currentTotalExpenses = useMemo(() => {
-        return filteredExpenses.reduce((sum, e) => sum + (e.total || 0), 0);
+        const sum = filteredExpenses.reduce((sum, e) => sum + (e.total || 0), 0);
+        return Math.round(sum * 100) / 100;
     }, [filteredExpenses]);
 
     // Initialize/Sync foodCostInput when expenses change
