@@ -27,15 +27,9 @@ const LineItemSchema = z.object({
     math_reasoning: z.string().optional()
 });
 const LineItemsArraySchema = z.array(LineItemSchema);
-
-
-// Parse credentials and config from env
-const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
 // Location where the processor was created (set DOCUMENT_AI_LOCATION env var, e.g. 'eu' or 'us')
 const processorLocation = process.env.DOCUMENT_AI_LOCATION || 'eu';
 
-// IMPORTANT: For non-US processors, we MUST use the regional API endpoint.
 // Using the default (US) endpoint for an EU processor causes INVALID_ARGUMENT errors.
 const docClient = new DocumentProcessorServiceClient({
     credentials: credentialsJson ? JSON.parse(credentialsJson) : undefined,
@@ -268,7 +262,8 @@ Verify: quantity × pricePerUnit ≈ totalPrice.
 If none found return [].
 Text:\n${rawText.substring(0, 3000)}`
         );
-        let text = result.response.candidates[0].content.parts[0].text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+        const rawTextObj = result.response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        let text = rawTextObj.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
         const parsed = safeParseJson(text);
         let items = Array.isArray(parsed) ? parsed : [];
         // Normalize units
@@ -341,10 +336,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let rawText = "";
     let structuredFields: { supplier?: string; total?: number; date?: string } = {};
 
+    // Parse credentials and config from env
+    const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
+    // Location where the processor was created (set DOCUMENT_AI_LOCATION env var, e.g. 'eu' or 'us')
+    const processorLocation = process.env.DOCUMENT_AI_LOCATION || 'eu';
+
     if (credentialsJson && processorId) {
         try {
             const credentials = JSON.parse(credentialsJson);
             const projectId = credentials.project_id;
+
+            // IMPORTANT: For non-US processors, we MUST use the regional API endpoint.
             const name = `projects/${projectId}/locations/${processorLocation}/processors/${processorId}`;
 
             const [result] = await docClient.processDocument({

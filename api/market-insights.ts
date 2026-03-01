@@ -12,21 +12,20 @@ const credentials = credentialsJson ? JSON.parse(credentialsJson) : {};
 const vertex_ai = new VertexAI({ project: credentials.project_id || process.env.VITE_FIREBASE_PROJECT_ID, location: 'us-central1' });
 
 const MarketPriceSchema = z.object({
-  marketPrice: z.number(),
-  recommendedUnit: z.string(),
-  confidence: z.enum(['high', 'medium', 'low'])
-});
+    marketPrice: z.number(),
+    recommendedUnit: z.string(),
+    confidence: z.enum(['high', 'medium', 'low'])
+})
+// ─── Cache TTL: 7 days in ms ──────────────────────────────────────────────────
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ─── Firebase Admin Init ──────────────────────────────────────────────────────
-const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+// credentialsJson is defined above
 if (getApps().length === 0 && credentialsJson) {
     const cred = JSON.parse(credentialsJson);
     initializeApp({ credential: cert(cred) });
 }
 const adminDb = getApps().length > 0 ? getFirestore() : null;
-
-// ─── Cache TTL: 7 days in ms ──────────────────────────────────────────────────
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ─── Safe JSON parser ─────────────────────────────────────────────────────────
 function safeParseJson(raw: string): any {
