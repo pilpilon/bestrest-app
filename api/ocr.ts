@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
 import { VertexAI } from '@google-cloud/vertexai';
-import { adminAuth } from './firebaseAdmin.js';
+import { adminAuth, adminDb } from './firebaseAdmin.js';
 import { z } from 'zod';
 
 export const maxDuration = 60;
@@ -171,23 +171,23 @@ function fixSwappedQtyPrice(items: any[]): any[] {
  */
 async function extractLineItemsFromImage(imageBase64: string, imageMimeType: string, rawTextHint?: string): Promise<any[]> {
     try {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const { GoogleGenerativeAI, SchemaType } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const model = genAI.getGenerativeModel({
             model: "gemini-2.5-pro", // Pro for max accuracy on Hebrew invoice image tables
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: {
-                    type: "array",
+                    type: SchemaType.ARRAY,
                     items: {
-                        type: "object",
+                        type: SchemaType.OBJECT,
                         properties: {
-                            name: { type: "string" },
-                            quantity: { type: "number" },
-                            unit: { type: "string" },
-                            pricePerUnit: { type: "number" },
-                            totalPrice: { type: "number" },
-                            math_reasoning: { type: "string" }
+                            name: { type: SchemaType.STRING },
+                            quantity: { type: SchemaType.NUMBER },
+                            unit: { type: SchemaType.STRING },
+                            pricePerUnit: { type: SchemaType.NUMBER },
+                            totalPrice: { type: SchemaType.NUMBER },
+                            math_reasoning: { type: SchemaType.STRING }
                         },
                         required: ["name", "quantity", "unit", "pricePerUnit", "totalPrice"]
                     }
@@ -266,22 +266,22 @@ If no line items found, return [].${textHint}`;
 // Text-based fallback — less accurate but used when image-based extraction fails
 async function extractLineItemsFromText(rawText: string): Promise<any[]> {
     try {
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const { GoogleGenerativeAI, SchemaType } = await import('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
         const model = genAI.getGenerativeModel({
             model: "gemini-2.5-flash",
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: {
-                    type: "array",
+                    type: SchemaType.ARRAY,
                     items: {
-                        type: "object",
+                        type: SchemaType.OBJECT,
                         properties: {
-                            name: { type: "string" },
-                            quantity: { type: "number" },
-                            unit: { type: "string" },
-                            pricePerUnit: { type: "number" },
-                            totalPrice: { type: "number" }
+                            name: { type: SchemaType.STRING },
+                            quantity: { type: SchemaType.NUMBER },
+                            unit: { type: SchemaType.STRING },
+                            pricePerUnit: { type: SchemaType.NUMBER },
+                            totalPrice: { type: SchemaType.NUMBER }
                         },
                         required: ["name", "quantity", "unit", "pricePerUnit", "totalPrice"]
                     }
