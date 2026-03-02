@@ -47,20 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     year: 'numeric',
   });
 
-  // Plain text body — sending text-only avoids MIME multipart issues
-  // that cause old accounting software (Rivhit etc.) to show the HTML as an extra attachment.
-  const textContent = `דוח חשבוניות - BestRest
-מסעדה: ${businessName || 'מסעדה'}
-חודש: ${monthYear}
-נשלח מ: ${userName || userEmail}
-
-סה"כ הוצאות לחודש: ${totalAmount.toLocaleString()} ש"ח
-כמות חשבוניות מצורפות: ${expenses.length} חשבוניות
-
-פירוט:
-${expenses.map((exp: any, i: number) => `${i + 1}. ספק: ${exp.supplier} | סכום: ₪${exp.total}`).join('\n')}
-
-נשלח אוטומטית באמצעות BestRest - מערכת ניהול הוצאות למסעדות.`;
+  // No text/html body — Rivhit and similar accounting software incorrectly display
+  // the email body as a phantom ATTACHMENT. Sending attachments-only avoids this.
 
   try {
     if (!process.env.RESEND_API_KEY) {
@@ -69,7 +57,6 @@ ${expenses.map((exp: any, i: number) => `${i + 1}. ספק: ${exp.supplier} | ס�
       return res.status(200).json({
         success: true,
         message: 'Report generated (Resend not yet configured)',
-        preview: textContent,
       });
     }
 
@@ -127,9 +114,11 @@ ${expenses.map((exp: any, i: number) => `${i + 1}. ספק: ${exp.supplier} | ס�
     const { data, error } = await resend.emails.send({
       from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to: [accountantEmail],
-      replyTo: userEmail, // Accountant can reply directly to the restaurant owner
+      replyTo: userEmail,
       subject: `דוח חשבוניות - ${businessName || 'מסעדה'} - ${monthYear}`,
-      text: textContent, // text-only: no MIME multipart, no phantom HTML attachment
+      // Single-space text body: Resend requires text or html, but a blank body
+      // won't appear as a phantom attachment in Rivhit / accounting software.
+      text: ' ',
       attachments: validAttachments.length > 0 ? validAttachments as any[] : undefined,
     });
 
