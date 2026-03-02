@@ -38,3 +38,26 @@ export const openPaddleCheckout = (priceId: string, email?: string, uid?: string
         }
     });
 };
+
+export const fetchManagementUrl = async (subscriptionId: string): Promise<string | null> => {
+    try {
+        const response = await fetch('/api/paddle-portal', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ subscriptionId })
+        });
+
+        if (!response.ok) {
+            console.error('Failed to fetch management URL', response.statusText);
+            return null;
+        }
+
+        const data = await response.json();
+        return data.url || data.updatePaymentMethod || data.cancel || null;
+    } catch (error) {
+        console.error('Error fetching Paddle portal URL:', error);
+        return null;
+    }
+};

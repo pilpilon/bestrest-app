@@ -10,6 +10,7 @@ interface AuthContextType {
     businessId: string | null;
     businessName: string | null;
     subscriptionTier: 'free' | 'pro';
+    paddleSubscriptionId: string | null;
     ocrScansToday: number;
     completedOnboarding: boolean;
     loading: boolean;
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [businessId, setBusinessId] = useState<string | null>(null);
     const [businessName, setBusinessName] = useState<string | null>(null);
     const [subscriptionTier, setSubscriptionTier] = useState<'free' | 'pro'>('free');
+    const [paddleSubscriptionId, setPaddleSubscriptionId] = useState<string | null>(null);
     const [ocrScansToday, setOcrScansToday] = useState<number>(0);
     const [completedOnboarding, setCompletedOnboarding] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -60,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             // Initialize new fields with fallbacks
                             const tier = data.subscriptionTier || 'free';
                             setSubscriptionTier(tier);
+                            setPaddleSubscriptionId(data.paddleSubscriptionId || null);
 
                             // Check if a new day started and we need to reset the counter
                             const now = new Date();
@@ -191,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         businessId,
         businessName,
         subscriptionTier,
+        paddleSubscriptionId,
         ocrScansToday,
         completedOnboarding,
         loading,

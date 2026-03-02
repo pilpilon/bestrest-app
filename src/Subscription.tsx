@@ -1,14 +1,38 @@
-import { Check, X, CreditCard, Sparkles, AlertCircle, Lock } from 'lucide-react';
+import { Check, X, CreditCard, Sparkles, AlertCircle, Lock, Settings } from 'lucide-react';
 import { useAuth } from './AuthContext';
-import { openPaddleCheckout } from './utils/paddle';
+import { openPaddleCheckout, fetchManagementUrl } from './utils/paddle';
+import { useState } from 'react';
 
 export function Subscription() {
-    const { user, subscriptionTier, ocrScansToday } = useAuth();
+    const { user, subscriptionTier, paddleSubscriptionId, ocrScansToday } = useAuth();
+    const [isLoadingPortal, setIsLoadingPortal] = useState(false);
 
     const isFree = subscriptionTier === 'free';
     const scansRemaining = Math.max(0, 1 - (ocrScansToday || 0));
     const scanPercentage = Math.min(100, ((ocrScansToday || 0) / 1) * 100);
     const isDangerZone = isFree && (ocrScansToday || 0) >= 1;
+
+    const handleManageSubscription = async () => {
+        if (!paddleSubscriptionId) {
+            alert("לא נמצא מזהה מנוי. אנא פנה לתמיכה.");
+            return;
+        }
+
+        setIsLoadingPortal(true);
+        try {
+            const url = await fetchManagementUrl(paddleSubscriptionId);
+            if (url) {
+                window.open(url, '_blank');
+            } else {
+                alert("שגיאה ביצירת קישור לניהול המנוי. אנא נסה שוב מאוחר יותר.");
+            }
+        } catch (error) {
+            console.error("Error managing subscription", error);
+            alert("שגיאה ביצירת קישור לניהול המנוי.");
+        } finally {
+            setIsLoadingPortal(false);
+        }
+    };
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
@@ -136,9 +160,22 @@ export function Subscription() {
                             תשלום מאובטח ב-Paddle
                         </button>
                     ) : (
-                        <div className="w-full bg-white/5 border border-white/10 text-[var(--color-primary)] font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-default">
-                            <Check className="w-5 h-5" />
-                            המנוי פעיל לחשבון זה
+                        <div className="space-y-3">
+                            <div className="w-full bg-white/5 border border-white/10 text-[var(--color-primary)] font-bold py-3 rounded-xl flex items-center justify-center gap-2 cursor-default">
+                                <Check className="w-5 h-5" />
+                                המנוי פעיל לחשבון זה
+                            </div>
+
+                            {paddleSubscriptionId && (
+                                <button
+                                    onClick={handleManageSubscription}
+                                    disabled={isLoadingPortal}
+                                    className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition-all active:scale-95 disabled:opacity-50"
+                                >
+                                    <Settings className="w-4 h-4" />
+                                    {isLoadingPortal ? 'פותח אזור אישי...' : 'ניהול מנוי (עדכון קלף / ביטול)'}
+                                </button>
+                            )}
                         </div>
                     )}
 

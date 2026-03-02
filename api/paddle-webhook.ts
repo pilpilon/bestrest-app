@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as admin from 'firebase-admin';
-// Since this is a serverless function, we need admin privileges to rewrite `subscriptionTier`
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
@@ -8,47 +7,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        // 1. In a truly secure implementation, you'd use @paddle/paddle-node-sdk
-        // to verify the signature (req.headers['paddle-signature']) 
-        // using your Webhook Secret Key.
-        // For example:
-        // const signature = req.headers['paddle-signature'] as string;
-        // const secret = process.env.PADDLE_WEBHOOK_SECRET;
-
-        // 2. Parse payload
         const payload = req.body;
 
-        // Let's assume the event is transaction.completed or subscription.updated
-        if (payload.event_type === 'transaction.completed' || payload.event_type === 'subscription.created') {
-            const data = payload.data;
+        // Ensure firebase admin is initialized
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: process.env.FIREBASE_PROJECT_ID,
+                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+                })
+            });
+        }
+        const db = admin.firestore();
+
+        const eventType = payload.event_type;
+        const data = payload.data;
+
+        if (eventType === 'transaction.completed' || eventType === 'subscription.created' || eventType === 'subscription.updated') {
             const customData = data.custom_data;
+            const customerId = data.customer_id;
+            const subscriptionId = data.subscription_id || data.id; // Depending on event type
 
             if (customData && customData.userId) {
                 const userId = customData.userId;
                 console.log(`[Paddle Webhook] Upgrading user ${userId} to PRO...`);
 
-                // 3. Update Firestore via Firebase Admin SDK
-                // NOTE: Requires firebase-admin to be set up securely
-                if (!admin.apps.length) {
-                    admin.initializeApp({
-                        credential: admin.credential.cert({
-                            projectId: process.env.FIREBASE_PROJECT_ID,
-                            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                            // Replace escaped newlines from env var
-                            privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-                        })
-                    });
-                }
-                const db = admin.firestore();
-                await db.collection('users').doc(userId).update({
+                const updateData: any = {
                     subscriptionTier: 'pro'
-                });
+                };
 
+                if (customerId) updateData.paddleCustomerId = customerId;
+                if (subscriptionId) updateData.paddleSubscriptionId = subscriptionId;
+
+                await db.collection('users').doc(userId).update(updateData);
                 console.log(`[Paddle Webhook] Successfully upgraded ${userId}`);
             }
         }
+        else if (eventType === 'subscription.canceled' || eventType === 'subscription.past_due') {
+            const customerId = data.customer_id;
+            const subscriptionId = data.id || data.subscription_id;
 
-        // Always return 200 so Paddle knows we received it
+            console.log(`[Paddle Webhook] Subscription canceled/past_due for customer ${customerId}`);
+
+            if (customerId) {
+                // Find all users with this customer ID (should theoretically be just one)
+                const usersRef = await db.collection('users').where('paddleCustomerId', '==', customerId).get();
+
+                const batch = db.batch();
+                usersRef.docs.forEach(doc => {
+                    batch.update(doc.ref, { subscriptionTier: 'free' });
+                });
+
+                await batch.commit();
+                console.log(`[Paddle Webhook] Successfully downgraded users with customer ID ${customerId}`);
+            }
+        }
+
         return res.status(200).json({ received: true });
 
     } catch (error: any) {
