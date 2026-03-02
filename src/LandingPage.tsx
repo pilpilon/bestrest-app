@@ -11,8 +11,8 @@ import {
     Star,
     ArrowLeft,
     ShieldCheck,
-    MessageCircle,
     SendHorizonal,
+    Boxes,
 } from 'lucide-react';
 import './index.css';
 
@@ -225,11 +225,6 @@ export function LandingPage({ onLogin }: LandingPageProps) {
         return () => window.removeEventListener('scroll', handler);
     }, []);
 
-    const handleUpgrade = () => {
-        const phone = '972500000000';
-        const text = 'היי, אני מעוניין להצטרף ל-BestRest Pro!';
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
-    };
 
     const navigateToLegal = (page: 'privacy' | 'terms' | 'refund') => {
         const path = page === 'privacy' ? '/privacy-policy' : page === 'terms' ? '/terms-of-service' : '/refund-policy';
@@ -268,6 +263,13 @@ export function LandingPage({ onLogin }: LandingPageProps) {
             description:
                 'ייצא דוחות חשבוניות לאקסל או שלח ישירות לרו"ח בלחיצה אחת. תוך שניות, בלי אימיילים ידניים.',
             accent: '#8B5CF6',
+        },
+        {
+            icon: Boxes,
+            title: 'ניהול מלאי מתקדם',
+            description:
+                'נהל את כל המלאי במקום אחד: קטגוריות, ספירות מלאי, מעקב אחר כמויות והתראות על חוסרים.',
+            accent: '#10B981',
         },
         {
             icon: Users,
@@ -588,9 +590,9 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                         description="לניסיון ראשון ולמסעדות קטנות"
                         features={[
                             'ניהול מתכונים מלא (Recipe Builder)',
-                            'ניהול עד 10 עובדים',
+                            'משתמש יחיד במערכת',
                             'סריקת חשבונית 1 ביום (AI)',
-                            'דשבורד הוצאות בסיסי',
+                            'ניהול מלאי ודשבורד בסיסי',
                             'ייצוא לאקסל / CSV לרו"ח',
                         ]}
                         notIncluded={[
@@ -607,16 +609,16 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                         description="לשליטה מלאה וחיסכון ענק בזמן"
                         features={[
                             'סריקת חשבוניות AI — ללא הגבלה',
-                            'בוט התראות על התייקרות מחירים',
+                            'בוט התראות על התייקרויות מחירים',
                             'ייצוא לאקסל + שליחה לרו"ח',
                             'סריקת תפריטים לבניית מתכונים',
                             'משתמשים ועובדים ללא הגבלה',
-                            'תמיכה עסקית בוואטסאפ',
+                            'תמיכה עסקית במייל',
                         ]}
-                        cta="שדרג עכשיו בוואטסאפ"
+                        cta="שדרג עכשיו ל-Pro"
                         highlighted
                         badge="הכי פופולרי"
-                        onCta={handleUpgrade}
+                        onCta={onLogin}
                     />
                 </div>
             </section>
@@ -695,14 +697,6 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                             >
                                 <SendHorizonal className="w-5 h-5" />
                                 התחל עכשיו — בחינם
-                            </button>
-                            <button
-                                onClick={handleUpgrade}
-                                className="flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm border border-white/15 hover:bg-white/8 transition-all"
-                                style={{ color: 'white' }}
-                            >
-                                <MessageCircle className="w-5 h-5" style={{ color: C.primary }} />
-                                שוחח איתנו בוואטסאפ
                             </button>
                         </div>
                     </div>
