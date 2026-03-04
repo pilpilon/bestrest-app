@@ -368,11 +368,11 @@ export function LandingPage({ onLogin }: LandingPageProps) {
             </nav>
 
             {/* ── HERO ── */}
-            <section className="relative pt-40 pb-28 px-6 max-w-6xl mx-auto">
-                <div className="max-w-2xl">
+            <section className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto flex flex-col items-center text-center">
+                <div className="max-w-3xl flex flex-col items-center">
                     {/* Badge */}
                     <div
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold mb-8 border"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full text-xs font-bold mb-8 border"
                         style={{ backgroundColor: `${C.primary}12`, borderColor: `${C.primary}30`, color: C.primary }}
                     >
                         <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: C.primary }} />
@@ -399,7 +399,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                         ויצא דוחות לרואה חשבון — הכל ממסך אחד, בעברית מלאה.
                     </p>
 
-                    <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex flex-wrap items-center justify-center gap-4">
                         <button
                             onClick={onLogin}
                             className="group flex items-center gap-2 px-8 py-4 rounded-xl font-black text-base transition-all hover:brightness-110 active:scale-95 whitespace-nowrap"
@@ -422,7 +422,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                     </div>
 
                     {/* Trust badges */}
-                    <div className="flex flex-wrap items-center gap-6 mt-10 text-xs font-medium" style={{ color: C.muted }}>
+                    <div className="flex flex-wrap items-center justify-center gap-6 mt-10 text-xs font-medium" style={{ color: C.muted }}>
                         <span className="flex items-center gap-1.5">
                             <ShieldCheck className="w-4 h-4" style={{ color: C.primary }} />
                             נתונים מאובטחים
@@ -438,53 +438,18 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                     </div>
                 </div>
 
-                {/* Dashboard preview card */}
-                <div
-                    className="hidden lg:block absolute left-6 top-1/2 -translate-y-1/2 w-[420px] rounded-2xl overflow-hidden border border-white/10 shadow-2xl max-w-full"
-                    style={{ backgroundColor: C.surface }}
-                >
-                    {/* Mock header */}
-                    <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
-                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
-                        <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
-                        <span className="text-xs mr-2 font-bold" style={{ color: C.muted }}>BestRest Dashboard</span>
-                    </div>
-                    {/* Mock KPI row */}
-                    <div className="p-4 grid grid-cols-2 gap-3">
-                        {[
-                            { label: 'הוצאות החודש', value: '₪48,320', color: C.primary },
-                            { label: 'חשבוניות שנסרקו', value: '84', color: C.secondary },
-                            { label: 'ספק מוביל', value: 'תמר בע"מ', color: '#F59E0B' },
-                            { label: 'מגמת מחירים', value: '+8% ⚡', color: '#EF4444' },
-                        ].map((kpi) => (
-                            <div key={kpi.label} className="bg-white/5 rounded-xl p-3 border border-white/5">
-                                <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: C.muted }}>
-                                    {kpi.label}
-                                </p>
-                                <p className="text-lg font-black break-words" style={{ color: kpi.color }}>{kpi.value}</p>
-                            </div>
-                        ))}
-                    </div>
-                    {/* Mock table rows */}
-                    <div className="px-4 pb-4 space-y-2">
-                        {[
-                            { supplier: 'יוסף ייצוא', cat: 'חומרי גלם', total: '₪5,200' },
-                            { supplier: 'ביח בשר', cat: 'חומרי גלם', total: '₪3,840' },
-                            { supplier: 'ברנר שתייה', cat: 'שתייה', total: '₪1,120' },
-                        ].map((row) => (
-                            <div key={row.supplier} className="flex items-center justify-between text-xs bg-white/5 rounded-lg px-3 py-2">
-                                <span className="font-bold text-white truncate max-w-[40%]">{row.supplier}</span>
-                                <span
-                                    className="px-2 py-0.5 rounded shrink-0"
-                                    style={{ backgroundColor: C.surface, color: C.muted }}
-                                >
-                                    {row.cat}
-                                </span>
-                                <span className="font-black shrink-0" style={{ color: C.primary }}>{row.total}</span>
-                            </div>
-                        ))}
-                    </div>
+                {/* ── VIDEO PLAYER ── */}
+                <div className="w-full mt-16 relative rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(16,185,129,0.2)] border border-white/10 bg-[#0B1120] group aspect-video">
+                    {/* Glass sheen overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-10" />
+                    <video
+                        src="/video.mp4"
+                        autoPlay
+                        controls
+                        muted={false}
+                        controlsList="nodownload"
+                        className="w-full h-full object-cover relative z-0"
+                    />
                 </div>
             </section>
 
