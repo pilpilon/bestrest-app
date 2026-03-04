@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Search, ChevronLeft, ChefHat, Info, Trash2, Target, TrendingUp, Camera, Loader2, Lock } from 'lucide-react';
+import { Search, Plus, Trash2, Camera, Loader2, ChefHat, Info, Target, TrendingUp, ChevronLeft } from 'lucide-react';
 import { RecipeBuilder } from './RecipeBuilder';
 import type { Recipe } from './RecipeBuilder';
 import { useAuth } from './AuthContext';
@@ -8,7 +8,7 @@ import { db, auth } from './firebase';
 import { UpgradeModal } from './UpgradeModal';
 
 export function Cookbook() {
-    const { businessId, subscriptionTier } = useAuth();
+    const { businessId } = useAuth();
     const [recipes, setRecipes] = useState<Recipe[]>([]);
     const [loading, setLoading] = useState(true);
     const [isBuilding, setIsBuilding] = useState(false);
@@ -86,7 +86,7 @@ export function Cookbook() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    ...(token ? { 'Authorization': `Bearer ${token} ` } : {})
                 },
                 body: JSON.stringify({ imageBase64: base64, mimeType: file.type })
             });
@@ -198,18 +198,10 @@ export function Cookbook() {
                     <input type="file" ref={menuInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleBulkMenuScan} />
 
                     <div className="relative">
-                        {subscriptionTier === 'free' && (
-                            <div
-                                className="absolute inset-0 z-10 backdrop-blur-[2px] bg-black/20 rounded-xl flex items-center justify-center cursor-pointer hover:bg-black/40 transition-colors"
-                                onClick={() => setShowUpgradeModal(true)}
-                            >
-                                <Lock className="w-4 h-4 text-white/80 mr-1" />
-                            </div>
-                        )}
                         <button
                             onClick={() => menuInputRef.current?.click()}
-                            disabled={isScanningMenu || subscriptionTier === 'free'}
-                            className={`bg-purple-500/10 text-purple-400 border border-purple-500/30 py-2.5 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-purple-500/20 transition-all ${(isScanningMenu || subscriptionTier === 'free') ? 'opacity-50' : ''}`}
+                            disabled={isScanningMenu}
+                            className={`bg - purple - 500 / 10 text - purple - 400 border border - purple - 500 / 30 py - 2.5 px - 4 rounded - xl font - bold text - sm flex items - center justify - center gap - 2 hover: bg - purple - 500 / 20 transition - all ${isScanningMenu ? 'opacity-50' : ''} `}
                         >
                             {isScanningMenu ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
                             {isScanningMenu ? 'סורק...' : 'סרוק תפריט'}
@@ -331,12 +323,12 @@ export function Cookbook() {
                                     <div className="text-xs text-[var(--color-text-muted)]">
                                         {recipe.ingredientsCount} מרכיבים
                                     </div>
-                                    <div className={`px-2.5 py-1 rounded-lg flex flex-col items-center group/tooltip relative ${statusBg}`}>
+                                    <div className={`px - 2.5 py - 1 rounded - lg flex flex - col items - center group / tooltip relative ${statusBg} `}>
                                         <div className="flex items-center gap-1">
                                             <span className="text-[8px] uppercase tracking-wider font-bold text-[var(--color-text-muted)] opacity-80">Food Cost</span>
                                             <Info className="w-2.5 h-2.5 text-[var(--color-text-muted)] cursor-help" />
                                         </div>
-                                        <span className={`font-black text-sm ${statusColor}`}>{foodCostPercent.toFixed(1)}%</span>
+                                        <span className={`font - black text - sm ${statusColor} `}>{foodCostPercent.toFixed(1)}%</span>
                                         {/* Tooltip Content */}
                                         <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-black/95 text-white text-[10px] p-2 rounded-lg opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all shadow-xl border border-white/10 z-10 font-medium pointer-events-none text-right">
                                             Food Cost הוא אחוז עלות חומרי הגלם מתוך מחיר המכירה. ככל שהאחוז נמוך יותר, המנה רווחית יותר. (יעד מומלץ: 25%-35%)

@@ -174,9 +174,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const incrementOcrScan = async () => {
         if (!user) return false;
         try {
-            if (subscriptionTier === 'free' && ocrScansToday >= 1) {
-                return false; // Deny if at limit
-            }
             const userDocRef = doc(db, 'users', user.uid);
             await setDoc(userDocRef, {
                 ocrScansToday: ocrScansToday + 1

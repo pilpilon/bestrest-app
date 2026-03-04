@@ -1,4 +1,4 @@
-import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2, CreditCard, Lock, Send, BarChart3, Package } from 'lucide-react';
+import { LayoutDashboard, Receipt, LogOut, Plus, Search, Download, Users, Settings, Trash2, CreditCard, Send, BarChart3, Package } from 'lucide-react';
 import './index.css';
 import { AuthProvider, useAuth } from './AuthContext';
 import { UpgradeModal } from './UpgradeModal';
@@ -27,7 +27,7 @@ import { TermsOfService } from './pages/TermsOfService';
 import { RefundPolicy } from './pages/RefundPolicy';
 
 function Dashboard() {
-  const { user, role, businessId, businessName, logout, subscriptionTier, ocrScansToday, incrementOcrScan } = useAuth();
+  const { user, role, businessId, businessName, logout, subscriptionTier, incrementOcrScan } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   /* uploadProgress state removed */
 
@@ -125,13 +125,6 @@ function Dashboard() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-
-    if (subscriptionTier === 'free' && (ocrScansToday || 0) >= 1) {
-      setUpgradeFeature('סריקת חשבונית וקריאת נתונים עם AI');
-      setShowUpgradeModal(true);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
 
     const jobId = Math.random().toString(36).substring(7);
     const fileName = file.name;
@@ -250,11 +243,6 @@ function Dashboard() {
   };
 
   const triggerUpload = () => {
-    if (subscriptionTier === 'free' && (ocrScansToday || 0) >= 1) {
-      setUpgradeFeature('סריקת חשבונית וקריאת נתונים עם AI');
-      setShowUpgradeModal(true);
-      return;
-    }
     fileInputRef.current?.click();
   };
 
@@ -811,20 +799,7 @@ function Dashboard() {
                 <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-2xl relative overflow-hidden">
                   <p className="text-[10px] text-[var(--color-text-muted)] font-bold uppercase tracking-wider mb-1">מגמת מחירים ⚡</p>
 
-                  {subscriptionTier === 'free' && (
-                    <div
-                      className="absolute inset-0 z-10 backdrop-blur-md bg-black/40 flex flex-col items-center justify-center cursor-pointer transition-colors hover:bg-black/50"
-                      onClick={() => {
-                        setUpgradeFeature('בוט התראות על התייקרות מחירים');
-                        setShowUpgradeModal(true);
-                      }}
-                    >
-                      <Lock className="w-5 h-5 text-white/70 mb-1" />
-                      <span className="text-[10px] font-bold text-white/90">זמין בפרו</span>
-                    </div>
-                  )}
-
-                  <div className={subscriptionTier === 'free' ? 'opacity-30 pointer-events-none' : ''}>
+                  <div className="">
                     {priceRiseAlerts.length > 0 ? (
                       <div className="space-y-1.5 mt-1">
                         {priceRiseAlerts.slice(0, 2).map(alert => (
@@ -1093,10 +1068,6 @@ function Dashboard() {
           ) : (
             <UsersManagement
               onNotify={setNotification}
-              onRequireUpgrade={(feature) => {
-                setUpgradeFeature(feature);
-                setShowUpgradeModal(true);
-              }}
               onNavigate={(view) => navigateTo(`/${view}`)}
               onLogout={logout}
             />
@@ -1387,7 +1358,7 @@ function ReportPreviewModal({
   );
 }
 
-function UsersManagement({ onNotify, onRequireUpgrade, onNavigate, onLogout }: { onNotify: (n: { type: 'success' | 'error', message: string }) => void, onRequireUpgrade: (feature: string) => void, onNavigate: (view: 'dashboard' | 'cookbook' | 'users' | 'subscription') => void, onLogout: () => void }) {
+function UsersManagement({ onNotify, onNavigate, onLogout }: { onNotify: (n: { type: 'success' | 'error', message: string }) => void, onNavigate: (view: 'dashboard' | 'cookbook' | 'users' | 'subscription') => void, onLogout: () => void }) {
   const { role, businessId, subscriptionTier } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1542,19 +1513,9 @@ function UsersManagement({ onNotify, onRequireUpgrade, onNavigate, onLogout }: {
         </h3>
 
         <div className="relative">
-          {subscriptionTier === 'free' && (
-            <div
-              className="absolute inset-0 z-10 backdrop-blur-[2px] bg-black/20 rounded-lg flex items-center justify-center cursor-pointer hover:bg-black/40 transition-colors"
-              onClick={() => onRequireUpgrade('הוספת משתמשים וניהול צוות')}
-            >
-              <Lock className="w-4 h-4 text-white/80 ml-1" />
-              <span className="text-xs font-bold text-white shadow-black drop-shadow-md">זמין בפרו</span>
-            </div>
-          )}
           <button
             onClick={copyInviteLink}
-            disabled={subscriptionTier === 'free'}
-            className={`bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${subscriptionTier === 'free' ? 'opacity-50' : ''}`}
+            className={`bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2`}
           >
             <Plus className="w-4 h-4" />
             העתק קישור הזמנה

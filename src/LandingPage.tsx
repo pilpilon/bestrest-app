@@ -359,10 +359,10 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                     {/* CTA */}
                     <button
                         onClick={onLogin}
-                        className="px-5 py-2.5 rounded-xl font-bold text-sm transition-all hover:brightness-110 active:scale-95"
+                        className="px-5 py-2.5 rounded-xl font-bold text-sm transition-all hover:brightness-110 active:scale-95 whitespace-nowrap"
                         style={{ backgroundColor: C.primary, color: '#0B1120' }}
                     >
-                        התחל בחינם
+                        חודש התנסות חינם
                     </button>
                 </div>
             </nav>
@@ -402,14 +402,14 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                     <div className="flex flex-wrap items-center gap-4">
                         <button
                             onClick={onLogin}
-                            className="group flex items-center gap-2 px-8 py-4 rounded-xl font-black text-base transition-all hover:brightness-110 active:scale-95"
+                            className="group flex items-center gap-2 px-8 py-4 rounded-xl font-black text-base transition-all hover:brightness-110 active:scale-95 whitespace-nowrap"
                             style={{
                                 backgroundColor: C.primary,
                                 color: '#0B1120',
                                 boxShadow: `0 0 30px ${C.primary}55`,
                             }}
                         >
-                            פתח חשבון חינם למסעדה
+                            התחל 30 ימי התנסות חינם
                             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                         </button>
                         <a
@@ -431,9 +431,9 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                             <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
                             ללא התחייבות
                         </span>
-                        <span className="flex items-center gap-1.5">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
                             <Check className="w-4 h-4" style={{ color: C.primary }} />
-                            סריקת AI אחת ביום - ללא עלות
+                            חודש התנסות חינם
                         </span>
                     </div>
                 </div>
@@ -580,44 +580,25 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                         מחיר שמתאים לכל מסעדה
                     </h2>
                     <p className="text-base mt-4 max-w-xl mx-auto" style={{ color: C.muted }}>
-                        התחל בחינם ושדרג רק כשאתה מוכן. ללא חוזה, ללא הפתעות.
+                        מחיר אחד, שקיפות מלאה. קבל את כל היכולות של המערכת ב-299₪ לחודש בלבד. ללא הגבלת משתמשים. 30 ימי ניסיון בחינם, ללא התחייבות.
                     </p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                    <PricingCard
-                        plan="חינם"
-                        price="₪0"
-                        description="לניסיון ראשון ולמסעדות קטנות"
-                        features={[
-                            'ניהול מתכונים מלא (Recipe Builder)',
-                            'משתמש יחיד במערכת',
-                            'סריקת חשבונית 1 ביום (AI)',
-                            'ניהול מלאי ודשבורד בסיסי',
-                            'ייצוא לאקסל / CSV לרו"ח',
-                        ]}
-                        notIncluded={[
-                            'התראות אוטומטיות על התייקרויות',
-                            'מודל AI מתקדם ומהיר יותר',
-                            'סריקות ללא הגבלה',
-                        ]}
-                        cta="התחל בחינם"
-                        onCta={onLogin}
-                    />
+                <div className="flex justify-center max-w-md mx-auto">
                     <PricingCard
                         plan="Pro ⭐"
                         price="₪299"
-                        description="לשליטה מלאה וחיסכון ענק בזמן"
+                        description="לשליטה מלאה וחיסכון ענק בזמן קלדנות ובקרה"
                         features={[
+                            'חודש ניסיון חינם לחלוטין',
                             'סריקת חשבוניות AI — ללא הגבלה',
                             'בוט התראות על התייקרויות מחירים',
                             'ייצוא לאקסל + שליחה לרו"ח',
                             'סריקת תפריטים לבניית מתכונים',
-                            'משתמשים ועובדים ללא הגבלה',
+                            'ניהול צוות ומשתמשים ללא הגבלה',
                             'תמיכה עסקית במייל',
                         ]}
-                        cta="שדרג עכשיו ל-Pro"
+                        cta="התחל חודש התנסות בחינם"
                         highlighted
-                        badge="הכי פופולרי"
                         onCta={onLogin}
                     />
                 </div>
@@ -688,7 +669,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                         <div className="flex flex-wrap items-center justify-center gap-4">
                             <button
                                 onClick={onLogin}
-                                className="flex items-center gap-2 px-10 py-4 rounded-xl font-black text-base transition-all hover:brightness-110 active:scale-95"
+                                className="flex items-center gap-2 px-10 py-4 rounded-xl font-black text-base transition-all hover:brightness-110 active:scale-95 whitespace-nowrap"
                                 style={{
                                     backgroundColor: C.primary,
                                     color: '#0B1120',
@@ -696,7 +677,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                                 }}
                             >
                                 <SendHorizonal className="w-5 h-5" />
-                                התחל עכשיו — בחינם
+                                התחל 30 ימי ניסיון בחינם
                             </button>
                         </div>
                     </div>
