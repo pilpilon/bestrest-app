@@ -18,6 +18,7 @@ import type { MarketInsight } from './utils/marketInsights';
 import { MarketInsightsCard } from './components/MarketInsightsCard';
 import { useScanQueue } from './hooks/useScanQueue';
 import { ScanQueuePanel } from './components/ScanQueuePanel';
+import { WebMCPIntegration } from './components/WebMCPIntegration';
 
 // Firebase Storage import removed — uploads now go directly to OCR API as base64
 import { collection, addDoc, serverTimestamp, query, where, orderBy, onSnapshot, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
@@ -654,6 +655,7 @@ function Dashboard() {
 
   return (
     <div className="bg-[var(--color-background)] text-[var(--color-text-main)] min-h-screen relative overflow-x-hidden font-display" dir="rtl">
+      <WebMCPIntegration expenses={expenses} />
       {/* Notifications */}
       {notification && (
         <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full border backdrop-blur-md shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300 flex items-center gap-3 ${notification.type === 'success'
