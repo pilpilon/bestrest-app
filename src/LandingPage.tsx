@@ -394,10 +394,25 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                         למסעדות מבוססת AI
                     </h1>
 
-                    <p className="text-lg leading-relaxed mb-10" style={{ color: C.muted }}>
+                    <p className="text-lg leading-relaxed mb-8" style={{ color: C.muted }}>
                         סרוק חשבוניות בשניות עם AI, עקוב אחרי עלויות הספקים בזמן אמת,
                         ויצא דוחות לרואה חשבון — הכל ממסך אחד, בעברית מלאה.
                     </p>
+
+                    {/* ── VIDEO PLAYER ── */}
+                    <div className="w-full max-w-4xl mx-auto mb-10 relative rounded-2xl md:rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(16,185,129,0.2)] border border-white/10 bg-[#0B1120] group aspect-video">
+                        {/* Glass sheen overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-10" />
+                        <video
+                            src="/video.mp4"
+                            autoPlay
+                            controls
+                            muted={false}
+                            controlsList="nodownload"
+                            className="w-full h-full object-contain relative z-0"
+                            playsInline
+                        />
+                    </div>
 
                     <div className="flex flex-wrap items-center justify-center gap-4">
                         <button
@@ -436,20 +451,6 @@ export function LandingPage({ onLogin }: LandingPageProps) {
                             חודש התנסות חינם
                         </span>
                     </div>
-                </div>
-
-                {/* ── VIDEO PLAYER ── */}
-                <div className="w-full mt-16 relative rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(16,185,129,0.2)] border border-white/10 bg-[#0B1120] group aspect-video">
-                    {/* Glass sheen overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-10" />
-                    <video
-                        src="/video.mp4"
-                        autoPlay
-                        controls
-                        muted={false}
-                        controlsList="nodownload"
-                        className="w-full h-full object-cover relative z-0"
-                    />
                 </div>
             </section>
 
