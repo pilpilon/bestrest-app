@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             const data = snapshot.data();
                             console.log("Profile data updated:", data);
                             setRole(data.role || 'manager');
-                            setBusinessId(data.businessId || 'main_branch');
+                            setBusinessId(data.businessId || currentUser.uid);
                             setBusinessName(data.businessName || null);
 
                             // Initialize new fields with fallbacks
